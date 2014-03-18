@@ -1,0 +1,4 @@
+#!/bin/bash
+[ -d "tmp" ] && rm -rf tmp
+mkdir tmp && cd tmp && cmake .. -DCMAKE_INSTALL_PREFIX=/home/eddy -DLOCALEDIR=/home/eddy/.local/share/locale -DDEBUG=1
+ln -s ../mask/holes.json 

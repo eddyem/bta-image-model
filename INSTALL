@@ -1,0 +1,4 @@
+1.  ./RUN
+2. cd tmp
+3. make
+[4. make install]

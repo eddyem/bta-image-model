@@ -1,0 +1,17 @@
+JSON format:
+
+global object MUST consist field "Z" or "maskz" with Z-coordinate of mask
+
+it CAN contain global fields (common to all holes) such as in holes array
+its field bbox (if exists) HAVE TO BE GLOBAL convex bbox of all holes!
+
+it MUST contain at least one hole object (or hole array)
+
+fields of "hole":
+	"shape"  - shape of hole (could be "square" and "round" or "ellipse")
+	"radius" - scalar or array[2] with radius parameter
+	"center" - array[2] with coordinates of hole's center
+	"bbox"   - array[4] with bounding box of a hole
+	
+	independently from shape any hole can consist both fields "radius" and "center" or single field "bbox"
+	

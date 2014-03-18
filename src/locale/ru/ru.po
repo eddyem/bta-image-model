@@ -1,0 +1,305 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid   ""
+msgstr  "Project-Id-Version: PACKAGE VERSION\n"
+        "Report-Msgid-Bugs-To: \n"
+        "POT-Creation-Date: 2013-04-02 16:58+0400\n"
+        "PO-Revision-Date: 2013-01-14 18:49+0400\n"
+        "Last-Translator: Edward V. Emelianov <eddy@sao.ru>\n"
+        "Language-Team: LANGUAGE <LL@li.org>\n"
+        "Language: Russian\n"
+        "MIME-Version: 1.0\n"
+        "Content-Type: text/plain; charset=koi8-r\n"
+        "Content-Transfer-Encoding: 8bit\n"
+
+#. / "\n\nВсе тесты пройдены успешно"
+#: wrapper.c:123
+#, fuzzy
+msgid   "\n"
+        "\n"
+        "All tests succeed"
+msgstr  "\n"
+        "\n"
+        "Все тесты пройдены успешно\n"
+        "\n"
+
+#. / " суммарная = "
+#: wrapper.c:106
+#, c-format
+msgid   " total= "
+msgstr  " суммарная = "
+
+#: diaphragm.c:95
+msgid   "\"bbox\" must contain an array of four doubles!\n"
+msgstr  ""
+
+#: diaphragm.c:141
+msgid   "\"center\" must contain an array of two doubles!\n"
+msgstr  ""
+
+#: diaphragm.c:130
+msgid   "\"radius\" array must consist of two doubles!\n"
+msgstr  ""
+
+#: diaphragm.c:135
+msgid   "\"radius\" must be a number or an array of two doubles!\n"
+msgstr  ""
+
+#. update old width counter
+#. check it
+#: mkHartmann.c:237
+msgid   "All rows must contain equal number of columns"
+msgstr  ""
+
+#. / "Тест выделения 100МБ памяти пройден успешно\n"
+#: wrapper.c:120
+#, c-format
+msgid   "Allocation test for 100MB of memory passed\n"
+msgstr  "Тест выделения 100МБ памяти пройден успешно\n"
+
+#. nothing found - wrong format
+#: cmdlnopts.c:213
+msgid   "Bad keyword!"
+msgstr  ""
+
+#. / "Ошибка выделения памяти"
+#: wrapper.c:83
+msgid   "Can't allocate memory"
+msgstr  "Ошибка выделения памяти"
+
+#: mkHartmann.c:323
+msgid   "Can't build mirror dZ arrays"
+msgstr  ""
+
+#. / "Не могу построить матрицу случайных чисел"
+#: mkHartmann.c:316
+msgid   "Can't build random matrix"
+msgstr  ""
+
+#: mkHartmann.c:199
+#, c-format
+msgid   "Can't close file %s"
+msgstr  ""
+
+#: diaphragm.c:220
+msgid   "Can't close mmap'ed file"
+msgstr  ""
+
+#. / "Ошибка определения доступной памяти"
+#: wrapper.c:81
+msgid   "Can't determine free memory"
+msgstr  "Ошибка определения доступной памяти"
+
+#. / "Ошибка получения свойств видеоядра"
+#: wrapper.c:79
+msgid   "Can't get properties"
+msgstr  "Ошибка получения свойств видеоядра"
+
+#. / "Не могу открыть"
+#: wrapper.c:154
+#, fuzzy
+msgid   "Can't open"
+msgstr  "Ошибка получения свойств видеоядра"
+
+#: diaphragm.c:214
+#, c-format
+msgid   "Can't open %s for reading"
+msgstr  ""
+
+#: mkHartmann.c:185
+#, fuzzy, c-format
+msgid   "Can't open file %s"
+msgstr  "Ошибка получения свойств видеоядра"
+
+#. / "Не могу прочесть"
+#: wrapper.c:159
+msgid   "Can't read"
+msgstr  ""
+
+#. file not exist but some error occured
+#: mkHartmann.c:172 diaphragm.c:216
+#, c-format
+msgid   "Can't stat %s"
+msgstr  ""
+
+#: mkHartmann.c:168
+#, c-format
+msgid   "Can't write to %s"
+msgstr  ""
+
+#: diaphragm.c:256
+msgid   "Corrupted file: no holes found!"
+msgstr  ""
+
+#: cmdlnopts.c:147
+msgid   "Degrees should be less than 360"
+msgstr  ""
+
+#: diaphragm.c:267
+msgid   "Didn't find any holes in json file!"
+msgstr  ""
+
+#. / "Ошибка в инициализации CUDA!"
+#: wrapper.c:99
+msgid   "Error in CUDA initialisation!"
+msgstr  "Ошибка в инициализации CUDA!"
+
+#: mkHartmann.c:259
+#, c-format
+msgid   "Error reading data: read %d numbers instaed of %d"
+msgstr  ""
+
+#: diaphragm.c:112
+msgid   "Error: NULL instead of aHole structure!\n"
+msgstr  ""
+
+#. / "В вычислениях по возможности будет использоваться GPU\n"
+#: wrapper.c:74
+msgid   "In computations will try to use GPU\n"
+msgstr  "В вычислениях по возможности будет использоваться GPU\n"
+
+#: mkHartmann.c:254
+msgid   "Input file was modified in runtime!"
+msgstr  ""
+
+#. nested arrays is error
+#: diaphragm.c:68
+msgid   "Invalid file format! Found nested arrays!\n"
+msgstr  ""
+
+#. non-numerical data?
+#: diaphragm.c:74
+msgid   "Invalid file format! Non-numerical data in array!\n"
+msgstr  ""
+
+#: diaphragm.c:178
+msgid   "Invalid holes array format!\n"
+msgstr  ""
+
+#: diaphragm.c:251
+msgid   "JSON file MUST contain floating point field \"Z\" or \"maskz\" with "
+        "mask's coordinate"
+msgstr  ""
+
+#. / "ПАМЯТЬ: свободная = "
+#: wrapper.c:103
+#, c-format
+msgid   "MEMORY: free = "
+msgstr  "ПАМЯТЬ: свободная = "
+
+#: mkHartmann.c:243
+msgid   "Matrix must be square"
+msgstr  ""
+
+#: diaphragm.c:219
+msgid   "Mmap error for input"
+msgstr  ""
+
+#: diaphragm.c:212
+msgid   "No filename given!"
+msgstr  ""
+
+#: mkHartmann.c:178
+msgid   "No output filename given"
+msgstr  ""
+
+#. / "Приложение скомпилировано без поддержки CUDA"
+#: wrapper.c:39 wrapper.c:48 wrapper.c:58
+msgid   "Tool was compiled without CUDA support"
+msgstr  ""
+
+#. / "В вычислениях используется только CPU\n"
+#: wrapper.c:112
+msgid   "Will use only CPU in computations\n"
+msgstr  "В вычислениях используется только CPU\n"
+
+#: mkHartmann.c:229
+msgid   "Wrong file: should be matrix of float data separated by spaces"
+msgstr  ""
+
+#: cmdlnopts.c:119
+msgid   "Wrong float number format!"
+msgstr  ""
+
+#: cmdlnopts.c:294
+#, c-format
+msgid   "Wrong format of image type: %c"
+msgstr  ""
+
+#. wrong format
+#: cmdlnopts.c:193
+msgid   "Wrong format: no value for keyword"
+msgstr  ""
+
+#: diaphragm.c:44
+msgid   "Wrong value! Get non-number!\n"
+msgstr  ""
+
+#: cmdlnopts.c:95
+msgid   "add random noice to mirror surface deviations"
+msgstr  ""
+
+#: cmdlnopts.c:93
+msgid   "amount of photons falled to one pixel of matrix by one iteration"
+msgstr  ""
+
+#: cmdlnopts.c:96
+msgid   "amplitude of random noice (default: 1e-8)"
+msgstr  ""
+
+#: cmdlnopts.c:97
+msgid   "filename for mirror surface deviations (in microns!)"
+msgstr  ""
+
+#: cmdlnopts.c:102
+msgid   "image type, arg=[jfpt] (Jpeg, Fits, Png, Tiff)"
+msgstr  ""
+
+#: cmdlnopts.c:100
+msgid   "print matrices on screen"
+msgstr  ""
+
+#: cmdlnopts.c:92
+msgid   "resulting image size"
+msgstr  ""
+
+#: cmdlnopts.c:98
+msgid   "rewrite output file if exists"
+msgstr  ""
+
+#: cmdlnopts.c:101
+msgid   "save intermediate results to images"
+msgstr  ""
+
+#: cmdlnopts.c:99
+msgid   "save matrices to file arg"
+msgstr  ""
+
+#: cmdlnopts.c:77
+msgid   "set mirror parameters, arg=[diam=num:foc=num:Zincl=ang:Aincl=ang:"
+        "Ao=ang:Zo=ang:C=num]\n"
+        "\t\t\tALL DEGREES ARE IN FORMAT [+-][DDd][MMm][SS.S] like "
+        "-10m13.4 !\n"
+        "\t\tdiam  - diameter of mirror\n"
+        "\t\tfoc   - mirror focus ratio\n"
+        "\t\tZincl - inclination from Z axe\n"
+        "\t\tAincl - azimuth of inclination\n"
+        "\t\tAobj  - azimuth of object\n"
+        "\t\tZobj  - zenith of object\n"
+        "\t\tccd   - Z-coordinate of light receiver"
+msgstr  ""
+
+#: cmdlnopts.c:89
+msgid   "show this help"
+msgstr  ""
+
+#: cmdlnopts.c:90
+msgid   "size of initial array of surface deviations"
+msgstr  ""
+
+#: cmdlnopts.c:91
+msgid   "size of interpolated array of surface deviations"
+msgstr  ""

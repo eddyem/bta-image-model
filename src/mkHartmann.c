@@ -26,116 +26,17 @@
 #include "wrapper.h"
 #include "saveimg.h"
 #include "diaphragm.h"
+#include "usefull_macros.h"
 
-/*
- * Coloured messages output
- */
-#define RED			"\033[1;31;40m"
-#define GREEN		"\033[1;32;40m"
-#define OLDCOLOR	"\033[0;0;0m"
-
-
-int globErr = 0; // errno for WARN/ERR
-// pointers to coloured output printf
-int (*red)(const char *fmt, ...);
-int (*green)(const char *fmt, ...);
-int (*_WARN)(const char *fmt, ...);
-
-/*
- * format red / green messages
- * name: r_pr_, g_pr_
- * @param fmt ... - printf-like format
- * @return number of printed symbols
- */
-int r_pr_(const char *fmt, ...){
-	va_list ar; int i;
-	printf(RED);
-	va_start(ar, fmt);
-	i = vprintf(fmt, ar);
-	va_end(ar);
-	printf(OLDCOLOR);
-	return i;
-}
-int g_pr_(const char *fmt, ...){
-	va_list ar; int i;
-	printf(GREEN);
-	va_start(ar, fmt);
-	i = vprintf(fmt, ar);
-	va_end(ar);
-	printf(OLDCOLOR);
-	return i;
-}
-/*
- * print red error/warning messages (if output is a tty)
- * @param fmt ... - printf-like format
- * @return number of printed symbols
- */
-int r_WARN(const char *fmt, ...){
-	va_list ar; int i = 1;
-	fprintf(stderr, RED);
-	va_start(ar, fmt);
-	if(globErr){
-		errno = globErr;
-		vwarn(fmt, ar);
-		errno = 0;
-		globErr = 0;
-	}else
-		i = vfprintf(stderr, fmt, ar);
-	va_end(ar);
-	i++;
-	fprintf(stderr, OLDCOLOR "\n");
-	return i;
-}
-
-const char stars[] = "****************************************";
-/*
- * notty variants of coloured printf
- * name: s_WARN, r_pr_notty
- * @param fmt ... - printf-like format
- * @return number of printed symbols
- */
-int s_WARN(const char *fmt, ...){
-	va_list ar; int i;
-	i = fprintf(stderr, "\n%s\n", stars);
-	va_start(ar, fmt);
-	if(globErr){
-		errno = globErr;
-		vwarn(fmt, ar);
-		errno = 0;
-		globErr = 0;
-	}else
-		i = +vfprintf(stderr, fmt, ar);
-	va_end(ar);
-	i += fprintf(stderr, "\n%s\n", stars);
-	i += fprintf(stderr, "\n");
-	return i;
-}
-int r_pr_notty(const char *fmt, ...){
-	va_list ar; int i;
-	i = printf("\n%s\n", stars);
-	va_start(ar, fmt);
-	i += vprintf(fmt, ar);
-	va_end(ar);
-	i += printf("\n%s\n", stars);
-	return i;
-}
-
-/*
- * safe memory allocation for macro ALLOC
- * @param N - number of elements to allocate
- * @param S - size of single element (typically sizeof)
- * @return pointer to allocated memory area
- */
-void *my_alloc(size_t N, size_t S){
-	void *p = calloc(N, S);
-	if(!p) ERR("malloc");
-	//assert(p);
-	return p;
-}
 
 char *outpfile = NULL; // filename for data output in octave text format
 int printDebug = 0;    // print tab
 bool firstRun = TRUE;  // first run: create new file
+int forceCPU = 0;
+
+void signals(int sig){exit (sig);}
+
+
 /**
  * Print tabular on screen (if outpfile == NULL) or to outpfile
  * 		in octave text format
@@ -190,7 +91,9 @@ void printTAB(size_t W, size_t H, float *data, char *mask, char *comment){
 	// now put out matrix itself (upside down - for octave/matlab)
 	for(y = 0; y < H; y++){
 		for(x = 0; x < W; x++){
-			PR(" %g", *data++);
+			//PR(" %g", *data++);
+			float d = data[H*(H-y-1) + x];
+			PR(" %g", d);
 		}
 		PR("\n");
 	}
@@ -212,7 +115,8 @@ float *read_deviations(char *filename, size_t *Size){
 	float *ret = NULL;
 	int W = 0, W0 = 0, H0 = 0, i;
 	size_t Mlen;
-	char *Mem = NULL, *endptr, *ptr;
+	mmapbuf *map;
+	char *endptr, *ptr, *dstart;
 	if(!filename){
 		assert(Size);
 		ret = MALLOC(float, (*Size) * (*Size)); // allocate matrix with given size
@@ -220,15 +124,16 @@ float *read_deviations(char *filename, size_t *Size){
 		return ret;
 	}
 	// there was filename given: try to read data from it
-	Mem = My_mmap(filename, &Mlen); // from diaphragm.c
-	ptr = Mem;
+	map = My_mmap(filename);
+	ptr = dstart = map->data;
+	Mlen = map->len;
 	do{
 		errno = 0;
 		strtof(ptr, &endptr);
 		if(errno || (endptr == ptr && *ptr))
-			ERRX(_("Wrong file: should be matrix of float data separated by spaces"));
+			ERR(_("Wrong file: should be matrix of float data separated by spaces"));
 		W++;
-		if(endptr >= Mem + Mlen) break; // eptr out of range - EOF?
+		if(endptr >= dstart + Mlen) break; // eptr out of range - EOF?
 		if(*endptr == '\n'){
 			H0++;
 			ptr = endptr + 1;
@@ -237,27 +142,26 @@ float *read_deviations(char *filename, size_t *Size){
 				ERRX(_("All rows must contain equal number of columns"));
 			W = 0;
 		}else ptr = endptr;
-	}while(endptr && endptr < Mem + Mlen);
+	}while(endptr && endptr < dstart + Mlen);
 	if(W > 1) H0++; // increase number of rows if there's no trailing '\n' in last line
 	if(W0 != H0)
 		ERRX(_("Matrix must be square"));
 	*Size = W0;
-	DBG("here");
 	ret = MALLOC(float, W0*W0);
-	DBG("there");
-	ptr = Mem;
+	ptr = dstart;
 	for(i = 0, H0 = 0; H0 < W0; H0++)
 		for(W = 0; W < W0; W++, i++){
-			DBG("%d ", i);
 			ret[W0*(W0-H0-1) + W] = strtof(ptr, &endptr) * 1e-6;
-			if(errno || (endptr == ptr && *ptr) || endptr >= Mem + Mlen)
-				ERRX(_("Input file was modified in runtime!"));
+			if(errno || (endptr == ptr && *ptr))
+				ERR(_("File modified in runtime?"));
+			if(endptr > dstart + Mlen) goto ex_for;
 			ptr = endptr;
 		}
+ex_for:
 	W0 *= W0;
 	if(i != W0)
-		ERRX(_("Error reading data: read %d numbers instaed of %d"), W-1, W0);
-	munmap(Mem, Mlen);
+		ERRX(_("Error reading data: read %d numbers instead of %d"), i, W0);
+	My_munmap(map);
 	return ret;
 }
 
@@ -279,21 +183,10 @@ int main(int argc, char **argv){
 	glob_pars *G = NULL; // default parameters see in cmdlnopts.c
 	mirPar *M = NULL;    // default mirror parameters
 	int x, y _U_;
-	// setup coloured output
-	if(isatty(STDOUT_FILENO)){ // make color output in tty
-		red = r_pr_; green = g_pr_;
-	}else{ // no colors in case of pipe
-		red = r_pr_notty; green = printf;
-	}
-	if(isatty(STDERR_FILENO)) _WARN = r_WARN;
-	else _WARN = s_WARN;
-	// Setup locale
-	setlocale(LC_ALL, "");
-	setlocale(LC_NUMERIC, "C");
-	bindtextdomain(GETTEXT_PACKAGE, LOCALEDIR);
-	textdomain(GETTEXT_PACKAGE);
-	G = parce_args(argc, argv);
+	initial_setup();
+	G = parse_args(argc, argv);
 	M = G->Mirror;
+	if(forceCPU) noCUDA();
 	// Run simple initialisation of CUDA and/or memory test
 	getprops();
 	size_t S0 = G->S_dev, S1 = G->S_interp, Sim = G->S_image, N_phot = G->N_phot;
@@ -310,10 +203,15 @@ int main(int argc, char **argv){
 	ALLOC(float, mirZ,  masksize); // mirror Z coordinate
 	ALLOC(float, mirDX, masksize); // projections of normale to mirror
 	ALLOC(float, mirDY, masksize);
-	if(G->randMask || G->randAmp != Gdefault.randAmp){ // add random numbers to mask
-		if(!fillrandarr(S0*S0, idata, G->randAmp))
+	if(G->randMask || G->randAmp > 0.){ // add random numbers to mask
+		size_t Ss = S0*S0;
+		ALLOC(float, tmpf,  Ss);
+		if(!fillrandarr(Ss, tmpf, G->randAmp))
 			/// "Не могу построить матрицу случайных чисел"
 			ERR(_("Can't build random matrix"));
+		OMP_FOR()
+		for(x = 0; x < Ss; x++) idata[x] += tmpf[x];
+		FREE(tmpf);
 	}
 	// initialize structure of mirror deviations
 	mirDeviations mD;
@@ -332,9 +230,9 @@ int main(int argc, char **argv){
 		{{-0.1,-0.45,0.6,0.6}, H_ELLIPSE}}; */
 
 	// Hartmann mask
-	Diaphragm dia; //{{-0.5, -0.5, 1., 1.}, NULL, 0, 20., NULL};
+	Diaphragm dia = {{-0.5, -0.5, 1., 1.}, NULL, 0, 20., NULL};
 	mirMask *mask;
-	readHoles("holes.json", &dia);
+	if(G->holes_filename) readHoles(G->holes_filename, &dia);
 	#ifdef EBUG
 	green("Dia: ");
 	printf("(%g, %g, %g, %g); %d holes, Z = %g\n", dia.box.x0, dia.box.y0,
@@ -347,100 +245,29 @@ int main(int argc, char **argv){
 		float *dm = MALLOC(float, S2);
 		for(x=0; x<S2; x++) dm[x] = (float)dia.mask->data[x];
 		writeimg("mirror_mask", imt, S, S, NULL, M, dm);
-		free(dm);
+		FREE(dm);
 	}
 	// coordinates of photons
 	ALLOC(float, xout, N_phot);
 	ALLOC(float, yout, N_phot);
 	// resulting image
 	ALLOC(float, image, Sim*Sim);
-/*
-//for(int i = 0; i < 100; i++){
-	box.x0 = -3.; box.y0 = -3.; box.w = 6.; box.h = 6.;
-	if(!getPhotonXY(xout, yout, 1, &mD, M, N_phot, &box))
-		ERR("Can't build photon map");
-	box.x0 = -15e-3; box.y0 = -15e-3; box.w = 30e-3; box.h = 30e-3;
-	//box.x0 = -5e-3; box.y0 = .8365; box.w = 10e-3; box.h = 10e-3;
-	if(!fillImage(xout, yout, N_phot, image, Sim, Sim, &box))
-		ERR("Can't fill output image");
-//}
-	writeimg("image", imt, Sim, Sim, &box, M, image);
-	FREE(xout); FREE(yout); FREE(image);
-*/
+
 	// CCD bounding box
-	BBox CCD = {-15e-3, -15e-3, 30e-3, 30e-3};
-	for(x = 0; x < 100; x++){
+	BBox CCD = {-5e-4*G->CCDW, -5e-4*G->CCDH, 1e-3*G->CCDW, 1e-3*G->CCDH};
+
+	green("Make %d iterations by %d photons on each", G->N_iter, N_phot);
+	printf("\n");
+	for(x = 0; x < G->N_iter; ++x){
+		if(x%1000 == 999) printf("Iteration %d\n", x+1);
 		if(!getPhotonXY(xout, yout, 1, &mD, M, N_phot, &box))
 			ERR("Can't build photon map");
 		if(!fillImage(xout, yout, N_phot, image, Sim, Sim, &CCD))
 			ERR("Can't fill output image");
 	}
-/*	int S = mask->WH;
-	double R = M->D / 2., scale = M->D / (double)S;
-	uint16_t *dptr = mask->data;
-	box.w = box.h = scale;
-	// check mask's pixels & throw photons to holes
-	for(y = 0; y < S; y++){
-		for(x = 0; x < S; x++, dptr++){
-			if(!*dptr) continue;
-			DBG("x = %d, Y=%d\n", x,y);
-			box.x0 = -R + scale*(double)x;
-			box.y0 = -R + scale*(double)y;
-			if(!getPhotonXY(xout, yout, 1, &mD, M, N_phot, &box))
-				ERR("Can't build photon map");
-			if(!fillImage(xout, yout, N_phot, image, Sim, Sim, &CCD))
-				ERR("Can't fill output image");
-		}
-	}
-*/
-	writeimg("image", imt, Sim, Sim, &CCD, M, image);
-	FREE(xout); FREE(yout); FREE(image);
-	// if rand() is good, amount of photons on image should be 785398 on every 1000000
-	//printTAB(Sim, Sim, image, NULL, "\n\nResulting image:");
-/*	for(x = 0; x < N_phot; x++)
-		if(fabs(xout[x]) < M->D/2. && fabs(yout[x]) < M->D/2.)
-			printf("photon #%4d:\t\t(%g, %g)\n", x, xout[x]*1e6, yout[x]*1e6);*/
+	FREE(xout); FREE(yout);
 
-/*	FILE *F = fopen("TESTs", "w");
-	if(!F) ERR("Can't open");
-	fprintf(F,"S1\tGPU\t\tCPU\n");
-
-
-	for(S1 = 100; ; S1 += S1*drand48()){
-	float *odata = my_alloc(S1*S1, sizeof(float));
-	double t0;
-	fprintf(F,"%zd", S1);
-	forceCUDA();
-	*/
-/*	int x, y; float *ptr = idata;
-	printf("Original array:\n");
-	for(y = 0; y < 5; y++){
-		for(x = 0; x < 5; x++){
-			*ptr *= 2.;
-			*ptr += x;
-			printf("%4.3f ", (*ptr++));
-		}
-		printf("\n");
-	}
-	t0 = dtime();
-	if(!bicubic_interp(odata, idata, S1,S1, S0,S0)) fprintf(F,"\tnan");
-	else fprintf(F,"\t%g", dtime() - t0);
-
-	printf("Enlarged array:\n");
-	ptr = odata;
-	for(y = 0; y < 20; y++){
-		for(x = 0; x < 20; x++)
-			printf("%4.3f ", (*ptr++));
-		printf("\n");
-	}
-	*
-	noCUDA();
-	t0 = dtime();
-	/// "Не могу построить интерполяцию"
-	if(!bicubic_interp(odata, idata, S1,S1, S0,S0)) ERR(_("Can't do interpolation"));
-	fprintf(F,"\t%g\n", dtime() - t0);
-	fflush(F);
-	free(odata);
-	}*/
+	writeimg(G->outfile, imt, Sim, Sim, &CCD, M, image);
+	FREE(image);
 	return 0;
 }

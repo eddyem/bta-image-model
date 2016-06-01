@@ -21,7 +21,7 @@ pkg_check_modules(${PROJ} REQUIRED
 #	gtkglext-1.0>=0.7.0
 #	gtkglext-x11-1.0>=0.7.0
 	cfitsio>=3.0
-	json>=0.9
+#	json>=0.9
 #	libpng>=1.5
 #	fftw3>=3.2.0
 	)

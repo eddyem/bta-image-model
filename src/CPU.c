@@ -21,6 +21,7 @@
 
 #define CPU_C
 #include "mkHartmann.h"
+#include "usefull_macros.h"
 #include "wrapper.h"
 
 // RANDOM NUMBER generation block  ============================================>
@@ -93,9 +94,22 @@ int CPUbicubic_interp(float *out, float *in,
 }
 // <========================================= end of BICUBIC interpolation block
 
-int CPUmkmirDeviat(float *map _U_, size_t mapWH _U_, float mirSZ _U_,
-						mirDeviations * mirDev _U_){
+/**
+ * Compute matrices of mirror surface deviation
+ * @param map, mapWH - square matrix of surface deviations (in meters) and its size
+ * @param mirDia - mirror diameter
+ * @param mirDev - deviations:
+ * 		.mirWH - size of output square matrices (mirWH x mirWH)
+ * 		.mirZ  - matrix of mirror Z variations (add to mirror Z)
+ * 		.mirDX, .mirDY - partial derivatives dZ/dx & dZ/dy (add to mirror der.)
+ * @return 0 if fails
+ */
+int CPUmkmirDeviat(float *map, size_t mapWH, float mirDia,
+						mirDeviations * mirDev){
 	FNAME();
+	size_t mirWH = mirDev->mirWH;
+	if(!CPUbicubic_interp(mirDev->mirZ,map,mirWH,mirWH,mapWH,mapWH)) return 0;
+	;
 	return 0;
 }
 
@@ -105,9 +119,3 @@ int CPUgetPhotonXY(float *xout _U_, float *yout _U_, int R _U_ ,mirDeviations *D
 	return 0;
 }
 
-/*
-int CPUfillImage(float *phX _U_, float *phY _U_, size_t ph_sz _U_,
-				float *image _U_, size_t imW _U_, size_t imH _U_, BBox *imbox _U_){
-	return 0;
-}
-*/

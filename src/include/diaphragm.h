@@ -26,6 +26,6 @@
 #include "wrapper.h"
 
 aHole *readHoles(char *filename, Diaphragm *dia);
-char *My_mmap(char *filename, size_t *Mlen);
+//char *My_mmap(char *filename, size_t *Mlen);
 
 #endif // __DIAPHRAGM_H__

@@ -20,30 +20,20 @@
  */
 
 #include "mkHartmann.h"
+#include "usefull_macros.h"
 #include "wrapper.h"
 #include "diaphragm.h"
 #include <sys/mman.h>
-#include <json/json.h>
+#include "json.h"
 
 /**
  * Get double value from object
  * @param jobj (i) - object
  * @return double value
  */
-double get_jdouble(json_object *jobj){
-	enum json_type type = json_object_get_type(jobj);
-	double val;
-	switch(type){
-		case json_type_double:
-			val = json_object_get_double(jobj);
-		break;
-		case json_type_int:
-			val = json_object_get_int(jobj);
-		break;
-		default:
-			ERRX(_("Wrong value! Get non-number!\n"));
-	}
-	return val;
+double get_jdouble(json_pair *val){
+	if(val->type != json_type_number) ERRX(_("Wrong value! Get non-number!\n"));
+	return json_pair_get_number(val);
 }
 
 /**
@@ -53,26 +43,19 @@ double get_jdouble(json_object *jobj){
  * @param getLen (o) - array length or NULL
  * @return filled array
  */
-double *json_get_array(json_object *jobj, int *getLen){
-	enum json_type type;
-	json_object *jarray = jobj;
-	int arraylen = json_object_array_length(jarray);
-	double *arr = calloc(arraylen, sizeof(double));
+double *json_get_array(json_pair *pair, int *getLen){
+	if(pair->type != json_type_data_array) return NULL;
+	size_t i, arraylen = pair->len;
+	if(arraylen < 1) return NULL;
+	double *arr = MALLOC(double, arraylen);
 	int L = 0;
-	int i;
-	json_object *jvalue;
-	for (i=0; i< arraylen; i++){
-		jvalue = json_object_array_get_idx(jarray, i);
-		type = json_object_get_type(jvalue);
-		if(type == json_type_array){ // nested arrays is error
-			ERRX(_("Invalid file format! Found nested arrays!\n"));
-		}
-		else if (type != json_type_object){
-			arr[L++] = get_jdouble(jvalue);
-		}
-		else{ // non-numerical data?
-			ERRX(_("Invalid file format! Non-numerical data in array!\n"));
-		}
+	char *jvalue;
+	for (i = 0; i< arraylen; i++){
+		jvalue = json_array_get_data(pair, i);
+		//DBG("get arr val[%zd]: %s",i, jvalue);
+		if(!jvalue) break;
+		arr[L++] = strtod(jvalue, NULL);
+		FREE(jvalue);
 	}
 	if(L == 0) FREE(arr);
 	if(getLen) *getLen = L;
@@ -84,18 +67,20 @@ double *json_get_array(json_object *jobj, int *getLen){
  *
  * @param B    (o) - output BBox (allocated outside)
  * @param jobj (i) - JSON object (array with BBox params)
+ * @return 0 if all OK
  */
-void json_get_bbox(BBox *B, json_object *jobj){
+int json_get_bbox(BBox *B, json_object *jobj){
 	double *arr = NULL;
 	int Len;
 	assert(B); assert(jobj);
-	json_object *o = json_object_object_get(jobj, "bbox");
-	if(!o) return;
+	json_pair *o = json_object_get_pair(jobj, "bbox");
+	if(!o) return 1;
 	if(!(arr = json_get_array(o, &Len)) || Len != 4){
 		ERRX(_("\"bbox\" must contain an array of four doubles!\n"));
 	}
 	B->x0 = arr[0]; B->y0 = arr[1]; B->w = arr[2]; B->h = arr[3];
 	FREE(arr);
+	return 0;
 }
 
 aHole globHole; // global parameters for all holes (in beginning of diafragm JSON)
@@ -103,29 +88,32 @@ aHole globHole; // global parameters for all holes (in beginning of diafragm JSO
  * Fills aHole object by data in JSON
  * @param jobj (i) - JSON data for hole
  * @param H    (o) - output hole object
+ * @return 0 if all OK
  */
-void get_obj_params(json_object *jobj, aHole *H){
+int get_obj_params(json_object *jobj, aHole *H){
 	double *arr = NULL;
+	if(!jobj) return 1;
 	int Len;
-	enum json_type type;
 	if(!H){
 		ERRX( _("Error: NULL instead of aHole structure!\n"));
 	}
 	memcpy(H, &globHole, sizeof(aHole)); // initialize hole by global values
-	json_object *o = json_object_object_get(jobj, "shape");
+	json_pair *o = json_object_get_pair(jobj, "shape");
 	if(o){
-		const char *ptr = json_object_get_string(o);
+		char *ptr = json_pair_get_string(o);
+		if(!ptr) ERRX(_("Wrong \"shape\" value"));
 		if(strcmp(ptr, "square") == 0) H->type = H_SQUARE;
 		else if(strcmp(ptr, "round") == 0 || strcmp(ptr, "ellipse") == 0 )  H->type = H_ELLIPSE;
 		else H->type = H_UNDEF;
+		//DBG("shape: %s", ptr);
 	}
-	o = json_object_object_get(jobj, "radius");
+	o = json_object_get_pair(jobj, "radius");
 	if(o){
-		type = json_object_get_type(o);
-		if(type == json_type_int || type == json_type_double){ // circle / square
-			double R = json_object_get_double(o);
+		//DBG("radius: %s", o->value);
+		if(o->type == json_type_number){ // circle / square
+			double R = strtod(o->value, NULL);
 			H->box.w = H->box.h = R * 2.;
-		}else if(type == json_type_array){ // ellipse / rectangle
+		}else if(o->type == json_type_data_array){ // ellipse / rectangle
 			if(!(arr = json_get_array(o, &Len)) || Len != 2){
 				ERRX(_("\"radius\" array must consist of two doubles!\n"));
 			}
@@ -135,8 +123,9 @@ void get_obj_params(json_object *jobj, aHole *H){
 			ERRX(_("\"radius\" must be a number or an array of two doubles!\n"));
 		}
 	}
-	o = json_object_object_get(jobj, "center");
+	o = json_object_get_pair(jobj, "center");
 	if(o){
+		//DBG("center");
 		if(!(arr = json_get_array(o, &Len)) || Len != 2){
 			ERRX(_("\"center\" must contain an array of two doubles!\n"));
 		}
@@ -144,16 +133,9 @@ void get_obj_params(json_object *jobj, aHole *H){
 		H->box.y0 = arr[1] - H->box.h/2.;
 		FREE(arr);
 	}else{
-		json_get_bbox(&H->box, jobj);
-	/*	o = json_object_object_get(jobj, "bbox");
-		if(o){
-			if(!(arr = json_get_array(o, &Len)) || Len != 4){
-				ERRX(_("\"bbox\" must contain an array of four doubles!\n"));
-			}
-			H->box.x0 = arr[0]; H->box.y0 = arr[1]; H->box.w = arr[2]; H->box.h = arr[3];
-			FREE(arr);
-		}*/
+		return json_get_bbox(&H->box, jobj);
 	}
+	return 0;
 }
 
 /**
@@ -163,22 +145,19 @@ void get_obj_params(json_object *jobj, aHole *H){
  * @param getLen (o) - length of array or NULL
  * @return holes array
  */
-aHole *json_parse_holesarray(json_object *jobj, int *getLen){
-	enum json_type type;
-	json_object *jarray = jobj;
-	int arraylen = json_object_array_length(jarray), i;
+aHole *json_parse_holesarray(json_pair *jobj, int *getLen){
+	int arraylen = jobj->len, i;
+	if(!arraylen || jobj->type != json_type_obj_array) return NULL;
 	aHole *H = calloc(arraylen, sizeof(aHole));
 	json_object *jvalue;
-	for (i=0; i < arraylen; i++){
-		jvalue = json_object_array_get_idx(jarray, i);
-		type = json_object_get_type(jvalue);
-		if(type == json_type_object){
-			get_obj_params(jvalue, &H[i]);
-		}else{
-			ERRX(_("Invalid holes array format!\n"));
-		}
+	for (i = 0; i < arraylen; i++){
+		jvalue = json_array_get_object(jobj, i);
+		if(!jvalue) break;
+		if(get_obj_params(jvalue, &H[i]))
+			ERRX(_("Invalid format for hole #%d!\n"), i);
+		json_free_obj(&jvalue);
 	}
-	if(getLen) *getLen = arraylen;
+	if(getLen) *getLen = i;
 	return H;
 }
 
@@ -200,72 +179,55 @@ char *gettype(aHole *H){
 #endif
 
 /**
- * Try to mmap a file
- *
- * @param filename (i) - name of file to mmap
- * @return pointer with mmap'ed file or die
- */
-char *My_mmap(char *filename, size_t *Mlen){
-	int fd;
-	char *ptr;
-	struct stat statbuf;
-	if(!filename) ERRX(_("No filename given!"));
-	if((fd = open(filename, O_RDONLY)) < 0)
-		ERR(_("Can't open %s for reading"), filename);
-	if(fstat (fd, &statbuf) < 0)
-		ERR(_("Can't stat %s"), filename);
-	*Mlen = statbuf.st_size;
-	if((ptr = mmap (0, *Mlen, PROT_READ, MAP_PRIVATE, fd, 0)) == MAP_FAILED)
-		ERR(_("Mmap error for input"));
-	if(close(fd)) ERR(_("Can't close mmap'ed file"));
-	return  ptr;
-}
-
-/**
  * Read holes array for diaphragm structure from file
  *
  * file should
  *
  * @param filename - name of file
- * @return readed structure or NULL if failed
+ * @return read structure or NULL if failed
  */
 aHole *readHoles(char *filename, Diaphragm *dia){
-	char *ptr;
-	enum json_type type;
-	json_object *o, *jobj;
-	int i, HolesNum;
-	aHole *HolesArray;
+	FNAME();
+	mmapbuf *map;
+	json_pair *o;
+	json_object *jobj;
+	int i, HolesNum = -1;
+	aHole *HolesArray = NULL;
 	BBox Dbox = {100.,100.,-200.,-200.}; // bounding box of diaphragm
-	size_t Mlen;
 	if(dia) memset(dia, 0, sizeof(Diaphragm));
-	ptr = My_mmap(filename, &Mlen);
-	jobj = json_tokener_parse(ptr);
+	map = My_mmap(filename);
+	jobj = json_tokener_parse(map->data);
+	if(!jobj) ERRX(_("Wrong JSON file"));
 	get_obj_params(jobj, &globHole); // read global parameters
 	// now try to find diaphragm bounding box & Z-coordinate
 	json_get_bbox(&Dbox, jobj);
 	// check for Z-coordinate
 	if(dia){
-		o = json_object_object_get(jobj, "Z");
-		if(!o) o = json_object_object_get(jobj, "maskz");
+		o = json_object_get_pair(jobj, "Z");
+		if(!o) o = json_object_get_pair(jobj, "maskz");
 		if(!o)
 			ERRX(_("JSON file MUST contain floating point field \"Z\" or \"maskz\" with mask's coordinate"));
 		dia->Z = get_jdouble(o); // read mask Z
 	}
-	o = json_object_object_get(jobj, "holes");
+	o = json_object_get_pair(jobj, "holes");
 	if(!o)
 		ERRX(_("Corrupted file: no holes found!"));
-	type = json_object_get_type(o);
-	if(type == json_type_object){ // single hole
-		HolesArray = calloc(1, sizeof(aHole));
-		assert(HolesArray);
+	if(o->type == json_type_object){ // single hole
+		HolesArray = MALLOC(aHole, 1);
 		HolesNum = 1;
-		get_obj_params(o, HolesArray);
-	}else{ // array of holes
+		json_object *obj = json_pair_get_object(o);
+		if(!obj) ERRX(_("Wrong hole descriptor"));
+		get_obj_params(obj, HolesArray);
+		json_free_obj(&obj);
+	}else if(o->type == json_type_obj_array){ // array of holes
+		//DBG("array of holes");
 		HolesArray = json_parse_holesarray(o, &HolesNum);
+	}else{
+		ERRX(_("Corrupted file: bad holes format!"));
 	}
 	if(!HolesArray || HolesNum < 1)
 		ERRX(_("Didn't find any holes in json file!"));
-	DBG("Readed %d holes", HolesNum);
+	//DBG("Read %d holes", HolesNum);
 	// check bbox of diafragm (or make it if none)
 	float minx=100., miny=100., maxx=-100., maxy=-100.;
 	for(i = 0; i < HolesNum; i++){
@@ -287,12 +249,13 @@ aHole *readHoles(char *filename, Diaphragm *dia){
 	if(Dbox.y0 > miny) Dbox.y0 = miny;
 	if(Dbox.w < wdth) Dbox.w = wdth;
 	if(Dbox.h < hght) Dbox.h = hght;
-	munmap(ptr, Mlen);
+	My_munmap(map);
 	if(dia){
 		dia->holes = HolesArray;
 		dia->Nholes = HolesNum;
 		memcpy(&dia->box, &Dbox, sizeof(BBox));
 	}
+	json_free_obj(&jobj);
 	return HolesArray;
 }
 

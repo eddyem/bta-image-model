@@ -1,5 +1,5 @@
 {
-	"maskz": 20.0,
+	"maskz": 20.017,
 	"shape": "round", "radius": 0.007500,
 	"holes": [
 		{ "ring": 0, "number":  0, "center": [  0.1742,  0.0172 ] },
@@ -258,7 +258,7 @@
 		{ "ring": 7, "number": 29, "center": [  0.4216, -0.2253 ] },
 		{ "ring": 7, "number": 30, "center": [  0.4574, -0.1388 ] },
 		{ "ring": 7, "number": 31, "center": [  0.4757, -0.0469 ] },
-		{ "mark": 1, "number":  0, "center": [  0.3141, -0.1301 ] },
-		{ "mark": 1, "number":  1, "center": [  0.0933, -0.4688 ] },
+		{ "mark": 1, "number":  0, "center": [  0.4416, -0.1829 ] },
+		{ "mark": 1, "number":  1, "center": [  0.0576, -0.2893 ] },
 	]
 }

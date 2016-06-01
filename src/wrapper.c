@@ -21,6 +21,8 @@
 
 #define WRAPPER_C
 #include "wrapper.h"
+#include "usefull_macros.h"
+#include "cmdlnopts.h"
 #ifdef EBUG
 	#include "saveimg.h"
 #endif
@@ -55,21 +57,13 @@ void forceCUDA(){ // not run on CPU even if GPU failed
 	CUforce = 1;
 #else
 	/// "Приложение скомпилировано без поддержки CUDA"
-	WARN(_("Tool was compiled without CUDA support"));
+	ERRX(_("Tool was compiled without CUDA support"));
 #endif
 }
 
-// Init function ==============================================================>
-/*
- * Init CUDA context and/or test memory allocation
- * name: getprops
- */
-void getprops(){
-	FNAME();
-	size_t mem = 100 * MB;
-	/// "Тест на выделение как минимум 100МБ памяти\n"
-	printf("Make a test for allocation at least 100MB memory\n");
 #ifdef CUDA_FOUND
+int testCUDA(){
+	size_t mem = 100 * MB;
 	/// "В вычислениях по возможности будет использоваться GPU\n"
 	red(_("In computations will try to use GPU\n"));
 	int status = 0;
@@ -94,6 +88,7 @@ void getprops(){
 		#undef _TEST
 	}while(0);
 	if(status){
+		if(CUforce) ERRX(_("Can't run CUDA!"));
 		Only_CPU = 1;
 		/// "Ошибка в инициализации CUDA!"
 		WARN(_("Error in CUDA initialisation!"));
@@ -106,11 +101,29 @@ void getprops(){
 		printf(_(" total= "));
 		green("%zdMB\n", theTotal / MB);
 	}
+	return status;
+}
 #endif
+
+
+// Init function ==============================================================>
+/*
+ * Init CUDA context and/or test memory allocation
+ * name: getprops
+ */
+void getprops(){
+	FNAME();
+	size_t mem = 100 * MB;
+	int status = 0;
+	/// "Тест на выделение как минимум 100МБ памяти\n"
+	printf("Make a test for allocation at least 100MB memory\n");
 	if(Only_CPU){
 		/// "В вычислениях используется только CPU\n"
 		green(_("Will use only CPU in computations\n"));
 	}
+#ifdef CUDA_FOUND
+	else status = testCUDA();
+#endif
 	// at last step - try to allocate main memory
 	char *ptr = (char *) malloc(mem);
 	/// "Ошибка выделения памяти"
@@ -126,18 +139,6 @@ void getprops(){
 }
 
 // Functions for pseudo-random number generators initialisation ===============>
-/*
- * Current time in seconds since UNIX epoch
- * name: dtime
- * @return time in seconds
- */
-double dtime(){
-	double t;
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	t = tv.tv_sec + ((double)tv.tv_usec)/1e6;
-	return t;
-}
 /*
  * Generate a quasy-random number to initialize PRNG
  * name: throw_random_seed
@@ -306,7 +307,7 @@ mirMask *makeDmask(Diaphragm *d, size_t minSz, mirPar *M, mirDeviations *D){
 	for(x = 0; x < d->Nholes; x++)
 		if(!histo[x]){
 			DBG("Oooops! Missed a hole!");
-			FREE(mdata);
+			FREE(mdata); FREE(histo);
 			return makeDmask(d, minSz*2, M, D);
 		}
 #ifdef EBUG
@@ -343,31 +344,32 @@ void freeDmask(mirMask *m){
  */
 int fillImage(float *phX, float *phY, size_t ph_sz,
 				float *image, size_t imW, size_t imH, BBox *imbox){
-	FNAME();
+	//FNAME();
 	float x0 = imbox->x0, y0 = imbox->y0, x1 = imbox->x0 + imbox->w, y1 = imbox->y0 + imbox->h;
 	float dX = imbox->w / (float)(imW - 1), dY = imbox->h / (float)(imH - 1), x=0,y=0;
 	size_t N;
-	#ifdef EBUG
+/*	#ifdef EBUG
 	float sum = 0., miss = 0., Xc = 0., Yc = 0.;
-	#endif
+	#endif */
 	for(N = 0; N < ph_sz; N++){
 		x = phX[N]; y = phY[N];
 		size_t X,Y;
 		if(x < x0 || x > x1 || y < y0 || y > y1){
-			#ifdef EBUG
+/*			#ifdef EBUG
 			miss += 1.;
-			#endif
+			#endif */
 		}else{
 			X = (size_t)((x - x0) / dX + 0.5);
-			Y = (size_t)((y1 - y) / dY + 0.5);
+			//Y = (size_t)((y1 - y) / dY + 0.5);
+			Y = (size_t)((y - y0) / dY + 0.5);
 			image[Y*imW + X] += 1.f;
-			#ifdef EBUG
+/*			#ifdef EBUG
 			sum += 1.;
 			Xc += x; Yc += y;
-			#endif
+			#endif*/
 		}
 	}
-	DBG("Photons on image: %g, missed: %g; TOTAL: %g\ncenter: Xc=%gmm, Yc=%gmm\nPI=%g",
-		sum,miss, sum+miss, Xc/sum*1000., Yc/sum*1000., 4.*sum/(sum+miss));
+//	DBG("Photons on image: %g, missed: %g; TOTAL: %g\ncenter: Xc=%gmm, Yc=%gmm\nPI=%g",
+//		sum,miss, sum+miss, Xc/sum*1000., Yc/sum*1000., 4.*sum/(sum+miss));
 	return 1;
 }

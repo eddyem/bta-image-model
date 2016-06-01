@@ -1,5 +1,5 @@
 /*
- * cmdlnopts.c - the only function that parce cmdln args and returns glob parameters
+ * cmdlnopts.c - the only function that parse cmdln args and returns glob parameters
  *
  * Copyright 2013 Edward V. Emelianoff <eddy@sao.ru>
  *
@@ -20,10 +20,11 @@
  */
 /*
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>*/
-#include "cmdlnopts.h"
+#include <stdlib.h>*/
 
+#include "cmdlnopts.h"
+#include "usefull_macros.h"
+#include <strings.h>
 
 // global variables for parsing
 glob_pars  G;
@@ -37,6 +38,7 @@ extern int rewrite_ifexists;
 extern char *outpfile; // output file name for saving matrixes
 extern int printDebug; // print tabulars with data on screen or to file
 extern int save_images;// save intermediate results to images
+extern int forceCPU;   // force using CPU even if videocard available
 
 // suboptions structure for get_suboptions
 // in array last MUST BE {0,0,0}
@@ -49,15 +51,20 @@ typedef struct{
 //            DEFAULTS
 // default global parameters
 glob_pars const Gdefault = {
-	8,		// size of initial array of surface deviations
-	100,	// size of interpolated S0
-	1000,	// resulting image size
-	10000,	// amount of photons falled to one pixel of S1 by one iteration
-	0,		// add to mask random numbers
-	1e-8,	// amplitude of added random noice
-	IT_FITS,// output image type
-	NULL,	// input deviations file name
-	NULL	// mirror
+	.S_dev = 8,			// size of initial array of surface deviations
+	.S_interp = 100,	// size of interpolated S0
+	.S_image = 1024,	// resulting image size
+	.N_phot = 10000,	// amount of photons falled to one pixel of S1 by one iteration
+	.N_iter = 1000,		// iterations number
+	.randMask = 0,		// add to mask random numbers
+	.randAmp = -1.,		// amplitude of added random noice
+	.CCDW = 30.,		// CCD width
+	.CCDH = 30.,		// CD height
+	.it = IT_FITS,		// output image type
+	.dev_filename = NULL,	// input deviations file name
+	.holes_filename = NULL,	// input holes file name
+	.outfile = "image",	// output file name
+	.Mirror = NULL		// mirror
 };
 //default mirror parameters
 mirPar const Mdefault = {
@@ -74,7 +81,7 @@ mirPar const Mdefault = {
 bool get_mir_par(void *arg, int N);
 bool get_imtype(void *arg, int N);
 
-char MirPar[] = N_("set mirror parameters, arg=[diam=num:foc=num:Zincl=ang:Aincl=ang:Ao=ang:Zo=ang:C=num]\n" \
+char MirPar[] = N_("set mirror parameters, arg=[diam=num:foc=num:Zincl=ang:Aincl=ang:Aobj=ang:Zoobj=ang:CCD=num]\n" \
 		"\t\t\tALL DEGREES ARE IN FORMAT [+-][DDd][MMm][SS.S] like -10m13.4 !\n" \
 		"\t\tdiam  - diameter of mirror\n" \
 		"\t\tfoc   - mirror focus ratio\n" \
@@ -87,19 +94,25 @@ char MirPar[] = N_("set mirror parameters, arg=[diam=num:foc=num:Zincl=ang:Aincl
 //	name	has_arg	flag	val		type		argptr			help
 myoption cmdlnopts[] = {
 	{"help",	0,	NULL,	'h',	arg_int,	APTR(&help),		N_("show this help")},
-	{"dev-size",1,	NULL,	'd',	arg_int,	APTR(&G.S_dev),		N_("size of initial array of surface deviations")},
+	{"dev-size",1,	NULL,	's',	arg_int,	APTR(&G.S_dev),		N_("size of initial array of surface deviations")},
 	{"int-size",1,	NULL,	'i',	arg_int,	APTR(&G.S_interp),	N_("size of interpolated array of surface deviations")},
-	{"image-size",1,NULL,	'I',	arg_int,	APTR(&G.S_image),	N_("resulting image size")},
+	{"image-size",1,NULL,	'S',	arg_int,	APTR(&G.S_image),	N_("resulting image size")},
 	{"N-photons",1,NULL,	'N',	arg_int,	APTR(&G.N_phot), 	N_("amount of photons falled to one pixel of matrix by one iteration")},
 	{"mir-parameters",1,NULL,'M',	arg_function,APTR(&get_mir_par),MirPar},
 	{"add-noice",0,	&G.randMask,1,	arg_none,	NULL,				N_("add random noice to mirror surface deviations")},
 	{"noice-amp",1,	NULL,	'a',	arg_float,	APTR(&G.randAmp),	N_("amplitude of random noice (default: 1e-8)")},
 	{"dev-file", 1,	NULL,	'F',	arg_string,	APTR(&G.dev_filename),N_("filename for mirror surface deviations (in microns!)")},
-	{"force",	0,	&rewrite_ifexists,1,arg_none,NULL,				N_("rewrite output file if exists")},
+	{"force",	0,	NULL,	'f',	arg_int,	APTR(&rewrite_ifexists),N_("rewrite output file if exists")},
 	{"log-file",1,	NULL,	'l',	arg_string,	APTR(&outpfile),	N_("save matrices to file arg")},
 	{"print-matr",0,&printDebug,1,	arg_none,	NULL,				N_("print matrices on screen")},
-	{"save-images",0,&save_images,1,arg_none,	NULL,				N_("save intermediate results to images")},
+	{"debug-images",0,NULL,	'd',	arg_int,	APTR(&save_images),	N_("save intermediate results to images")},
 	{"image-type",1,NULL,	'T',	arg_function,APTR(&get_imtype),	N_("image type, arg=[jfpt] (Jpeg, Fits, Png, Tiff)")},
+	{"holes-file",1,NULL,	'j',	arg_string,	APTR(&G.holes_filename),N_("name of JSON file with holes description")},
+	{"N-iter",	1,	NULL,	'I',	arg_int,	APTR(&G.N_iter),	N_("amount of iterations by N-photons")},
+	{"ccd-w",	1,	NULL,	'W',	arg_float,	APTR(&G.CCDW),		N_("CCD width (in millimeters)")},
+	{"ccd-h",	1,	NULL,	'H',	arg_float,	APTR(&G.CCDH),		N_("CCD height (in millimeters)")},
+	{"outfile",	1,	NULL,	'o',	arg_string,	APTR(&G.outfile),	N_("output image file name")},
+	{"force-cpu",0,	&forceCPU,1,	arg_none,	NULL,				N_("force CPU using iven if have videocard")},
 	end_option
 };
 
@@ -239,13 +252,13 @@ bool get_mir_par(void *arg, int N _U_){
 }
 
 /**
- * Parce command line options and return dynamically allocated structure
+ * Parse command line options and return dynamically allocated structure
  * 		to global parameters
  * @param argc - copy of argc from main
  * @param argv - copy of argv from main
  * @return allocated structure with global parameters
  */
-glob_pars *parce_args(int argc, char **argv){
+glob_pars *parse_args(int argc, char **argv){
 	int i;
 	void *ptr;
 	ptr = memcpy(&G, &Gdefault, sizeof(G)); assert(ptr);
@@ -254,7 +267,7 @@ glob_pars *parce_args(int argc, char **argv){
 	// format of help: "Usage: progname [args]\n"
 	change_helpstring("Usage: %s [args]\n\n\tWhere args are:\n");
 	// parse arguments
-	parceargs(&argc, &argv, cmdlnopts);
+	parseargs(&argc, &argv, cmdlnopts);
 	if(help) showhelp(-1, cmdlnopts);
 	if(argc > 0){
 		printf("\nIgnore argument[s]:\n");

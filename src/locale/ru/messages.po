@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2013-04-02 17:54+0400\n"
+"POT-Creation-Date: 2016-06-01 13:49+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,187 +17,244 @@ msgstr ""
 "Content-Type: text/plain; charset=koi8-r\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: mkHartmann.c:168
+#. amount of pcount and/or scount wrong
+#. / "Неправильный формат строки помощи"
+#: parseargs.c:56
+msgid "Wrong helpstring!"
+msgstr ""
+
+#. / "Целое вне допустимого диапазона"
+#: parseargs.c:86
+msgid "Integer out of range"
+msgstr ""
+
+#. / "Неправильный параметр: %s"
+#: parseargs.c:480
+#, c-format
+msgid "Wrong parameter: %s"
+msgstr ""
+
+#. / "%s: необходим аргумент!"
+#: parseargs.c:485
+#, c-format
+msgid "%s: argument needed!"
+msgstr ""
+
+#. / "Неправильный аргумент \"%s\" параметра \"%s\""
+#: parseargs.c:490
+#, c-format
+msgid "Wrong argument \"%s\" of parameter \"%s\""
+msgstr ""
+
+#: mkHartmann.c:69
 #, c-format
 msgid "Can't write to %s"
 msgstr ""
 
 #. file not exist but some error occured
-#: mkHartmann.c:172 diaphragm.c:216
+#: mkHartmann.c:73 usefull_macros.c:177
 #, c-format
 msgid "Can't stat %s"
 msgstr ""
 
-#: mkHartmann.c:178
+#: mkHartmann.c:79
 msgid "No output filename given"
 msgstr ""
 
-#: mkHartmann.c:185
+#: mkHartmann.c:86
 #, c-format
 msgid "Can't open file %s"
 msgstr ""
 
-#: mkHartmann.c:199
+#: mkHartmann.c:102
 #, c-format
 msgid "Can't close file %s"
 msgstr ""
 
-#: mkHartmann.c:229
+#: mkHartmann.c:134
 msgid "Wrong file: should be matrix of float data separated by spaces"
 msgstr ""
 
 #. update old width counter
 #. check it
-#: mkHartmann.c:237
+#: mkHartmann.c:142
 msgid "All rows must contain equal number of columns"
 msgstr ""
 
-#: mkHartmann.c:243
+#: mkHartmann.c:148
 msgid "Matrix must be square"
 msgstr ""
 
-#: mkHartmann.c:254
-msgid "Input file was modified in runtime!"
+#: mkHartmann.c:156
+msgid "File modified in runtime?"
 msgstr ""
 
-#: mkHartmann.c:259
+#: mkHartmann.c:163
 #, c-format
-msgid "Error reading data: read %d numbers instaed of %d"
+msgid "Error reading data: read %d numbers instead of %d"
 msgstr ""
 
 #. / "Не могу построить матрицу случайных чисел"
-#: mkHartmann.c:316
+#: mkHartmann.c:211
 msgid "Can't build random matrix"
 msgstr ""
 
-#: mkHartmann.c:323
+#: mkHartmann.c:221
 msgid "Can't build mirror dZ arrays"
 msgstr ""
 
-#: diaphragm.c:44
-msgid "Wrong value! Get non-number!\n"
-msgstr ""
-
-#. nested arrays is error
-#: diaphragm.c:68
-msgid "Invalid file format! Found nested arrays!\n"
-msgstr ""
-
-#. non-numerical data?
-#: diaphragm.c:74
-msgid "Invalid file format! Non-numerical data in array!\n"
-msgstr ""
-
-#: diaphragm.c:95
-msgid "\"bbox\" must contain an array of four doubles!\n"
-msgstr ""
-
-#: diaphragm.c:112
-msgid "Error: NULL instead of aHole structure!\n"
-msgstr ""
-
-#: diaphragm.c:130
-msgid "\"radius\" array must consist of two doubles!\n"
-msgstr ""
-
-#: diaphragm.c:135
-msgid "\"radius\" must be a number or an array of two doubles!\n"
-msgstr ""
-
-#: diaphragm.c:141
-msgid "\"center\" must contain an array of two doubles!\n"
-msgstr ""
-
-#: diaphragm.c:178
-msgid "Invalid holes array format!\n"
-msgstr ""
-
-#: diaphragm.c:212
+#: usefull_macros.c:173
 msgid "No filename given!"
 msgstr ""
 
-#: diaphragm.c:214
+#: usefull_macros.c:175
 #, c-format
 msgid "Can't open %s for reading"
 msgstr ""
 
-#: diaphragm.c:219
+#: usefull_macros.c:180
 msgid "Mmap error for input"
 msgstr ""
 
-#: diaphragm.c:220
+#: usefull_macros.c:181
 msgid "Can't close mmap'ed file"
 msgstr ""
 
-#: diaphragm.c:251
+#: usefull_macros.c:190
+msgid "Can't munmap"
+msgstr ""
+
+#: usefull_macros.c:214
+msgid "Can't setup console"
+msgstr ""
+
+#. Get settings
+#: usefull_macros.c:283
+msgid "Can't get settings"
+msgstr ""
+
+#: usefull_macros.c:293
+msgid "Can't set settings"
+msgstr ""
+
+#: diaphragm.c:35
+msgid "Wrong value! Get non-number!\n"
+msgstr ""
+
+#: diaphragm.c:79
+msgid "\"bbox\" must contain an array of four doubles!\n"
+msgstr ""
+
+#: diaphragm.c:98
+msgid "Error: NULL instead of aHole structure!\n"
+msgstr ""
+
+#: diaphragm.c:104
+msgid "Wrong \"shape\" value"
+msgstr ""
+
+#: diaphragm.c:118
+msgid "\"radius\" array must consist of two doubles!\n"
+msgstr ""
+
+#: diaphragm.c:123
+msgid "\"radius\" must be a number or an array of two doubles!\n"
+msgstr ""
+
+#: diaphragm.c:130
+msgid "\"center\" must contain an array of two doubles!\n"
+msgstr ""
+
+#: diaphragm.c:157
+#, c-format
+msgid "Invalid format for hole #%d!\n"
+msgstr ""
+
+#: diaphragm.c:200
+msgid "Wrong JSON file"
+msgstr ""
+
+#: diaphragm.c:209
 msgid ""
 "JSON file MUST contain floating point field \"Z\" or \"maskz\" with mask's "
 "coordinate"
 msgstr ""
 
-#: diaphragm.c:256
+#: diaphragm.c:214
 msgid "Corrupted file: no holes found!"
 msgstr ""
 
-#: diaphragm.c:267
+#: diaphragm.c:219
+msgid "Wrong hole descriptor"
+msgstr ""
+
+#: diaphragm.c:226
+msgid "Corrupted file: bad holes format!"
+msgstr ""
+
+#: diaphragm.c:229
 msgid "Didn't find any holes in json file!"
 msgstr ""
 
 #. / "Приложение скомпилировано без поддержки CUDA"
-#: wrapper.c:39 wrapper.c:48 wrapper.c:58
+#: wrapper.c:41 wrapper.c:50 wrapper.c:60
 msgid "Tool was compiled without CUDA support"
 msgstr ""
 
 #. / "В вычислениях по возможности будет использоваться GPU\n"
-#: wrapper.c:74
+#: wrapper.c:68
 msgid "In computations will try to use GPU\n"
 msgstr ""
 
 #. / "Ошибка получения свойств видеоядра"
-#: wrapper.c:79
+#: wrapper.c:73
 msgid "Can't get properties"
 msgstr ""
 
 #. / "Ошибка определения доступной памяти"
-#: wrapper.c:81
+#: wrapper.c:75
 msgid "Can't determine free memory"
 msgstr ""
 
 #. / "Ошибка выделения памяти"
-#: wrapper.c:83
+#: wrapper.c:77
 msgid "Can't allocate memory"
 msgstr ""
 
+#: wrapper.c:91
+msgid "Can't run CUDA!"
+msgstr ""
+
 #. / "Ошибка в инициализации CUDA!"
-#: wrapper.c:99
+#: wrapper.c:94
 msgid "Error in CUDA initialisation!"
 msgstr ""
 
 #. / "ПАМЯТЬ: свободная = "
-#: wrapper.c:103
+#: wrapper.c:98
 #, c-format
 msgid "MEMORY: free = "
 msgstr ""
 
 #. / " суммарная = "
-#: wrapper.c:106
+#: wrapper.c:101
 #, c-format
 msgid " total= "
 msgstr ""
 
 #. / "В вычислениях используется только CPU\n"
-#: wrapper.c:112
+#: wrapper.c:122
 msgid "Will use only CPU in computations\n"
 msgstr ""
 
 #. / "Тест выделения 100МБ памяти пройден успешно\n"
-#: wrapper.c:120
+#: wrapper.c:133
 #, c-format
 msgid "Allocation test for 100MB of memory passed\n"
 msgstr ""
 
 #. / "\n\nВсе тесты пройдены успешно"
-#: wrapper.c:123
+#: wrapper.c:136
 msgid ""
 "\n"
 "\n"
@@ -205,19 +262,19 @@ msgid ""
 msgstr ""
 
 #. / "Не могу открыть"
-#: wrapper.c:154
+#: wrapper.c:155
 msgid "Can't open"
 msgstr ""
 
 #. / "Не могу прочесть"
-#: wrapper.c:159
+#: wrapper.c:160
 msgid "Can't read"
 msgstr ""
 
-#: cmdlnopts.c:77
+#: cmdlnopts.c:84
 msgid ""
-"set mirror parameters, arg=[diam=num:foc=num:Zincl=ang:Aincl=ang:Ao=ang:"
-"Zo=ang:C=num]\n"
+"set mirror parameters, arg=[diam=num:foc=num:Zincl=ang:Aincl=ang:Aobj=ang:"
+"Zoobj=ang:CCD=num]\n"
 "\t\t\tALL DEGREES ARE IN FORMAT [+-][DDd][MMm][SS.S] like -10m13.4 !\n"
 "\t\tdiam  - diameter of mirror\n"
 "\t\tfoc   - mirror focus ratio\n"
@@ -228,77 +285,101 @@ msgid ""
 "\t\tccd   - Z-coordinate of light receiver"
 msgstr ""
 
-#: cmdlnopts.c:89
+#: cmdlnopts.c:96
 msgid "show this help"
 msgstr ""
 
-#: cmdlnopts.c:90
+#: cmdlnopts.c:97
 msgid "size of initial array of surface deviations"
 msgstr ""
 
-#: cmdlnopts.c:91
+#: cmdlnopts.c:98
 msgid "size of interpolated array of surface deviations"
 msgstr ""
 
-#: cmdlnopts.c:92
+#: cmdlnopts.c:99
 msgid "resulting image size"
 msgstr ""
 
-#: cmdlnopts.c:93
+#: cmdlnopts.c:100
 msgid "amount of photons falled to one pixel of matrix by one iteration"
 msgstr ""
 
-#: cmdlnopts.c:95
+#: cmdlnopts.c:102
 msgid "add random noice to mirror surface deviations"
 msgstr ""
 
-#: cmdlnopts.c:96
+#: cmdlnopts.c:103
 msgid "amplitude of random noice (default: 1e-8)"
 msgstr ""
 
-#: cmdlnopts.c:97
+#: cmdlnopts.c:104
 msgid "filename for mirror surface deviations (in microns!)"
 msgstr ""
 
-#: cmdlnopts.c:98
+#: cmdlnopts.c:105
 msgid "rewrite output file if exists"
 msgstr ""
 
-#: cmdlnopts.c:99
+#: cmdlnopts.c:106
 msgid "save matrices to file arg"
 msgstr ""
 
-#: cmdlnopts.c:100
+#: cmdlnopts.c:107
 msgid "print matrices on screen"
 msgstr ""
 
-#: cmdlnopts.c:101
+#: cmdlnopts.c:108
 msgid "save intermediate results to images"
 msgstr ""
 
-#: cmdlnopts.c:102
+#: cmdlnopts.c:109
 msgid "image type, arg=[jfpt] (Jpeg, Fits, Png, Tiff)"
 msgstr ""
 
-#: cmdlnopts.c:119
+#: cmdlnopts.c:110
+msgid "name of JSON file with holes description"
+msgstr ""
+
+#: cmdlnopts.c:111
+msgid "amount of iterations by N-photons"
+msgstr ""
+
+#: cmdlnopts.c:112
+msgid "CCD width (in millimeters)"
+msgstr ""
+
+#: cmdlnopts.c:113
+msgid "CCD height (in millimeters)"
+msgstr ""
+
+#: cmdlnopts.c:114
+msgid "output image file name"
+msgstr ""
+
+#: cmdlnopts.c:115
+msgid "force CPU using iven if have videocard"
+msgstr ""
+
+#: cmdlnopts.c:132
 msgid "Wrong float number format!"
 msgstr ""
 
-#: cmdlnopts.c:147
+#: cmdlnopts.c:160
 msgid "Degrees should be less than 360"
 msgstr ""
 
 #. wrong format
-#: cmdlnopts.c:193
+#: cmdlnopts.c:206
 msgid "Wrong format: no value for keyword"
 msgstr ""
 
 #. nothing found - wrong format
-#: cmdlnopts.c:213
+#: cmdlnopts.c:226
 msgid "Bad keyword!"
 msgstr ""
 
-#: cmdlnopts.c:294
+#: cmdlnopts.c:307
 #, c-format
 msgid "Wrong format of image type: %c"
 msgstr ""

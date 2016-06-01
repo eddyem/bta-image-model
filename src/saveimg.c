@@ -20,6 +20,7 @@
  */
 
 #include "mkHartmann.h"
+#include "usefull_macros.h"
 #include "cmdlnopts.h" // for flag "-f", which will tell to rewrite existing file
 #include "saveimg.h"
 #if defined __PNG && __PNG == TRUE
@@ -118,6 +119,7 @@ void get_stat(float *img, size_t size){
 		if(max < pv) max = pv;
 		if(min > pv) min = pv;
 	}
+	glob_stat.image = img;
 	glob_stat.avr = sum/sz;
 	glob_stat.std = sqrt(fabs(sum2/sz - glob_stat.avr*glob_stat.avr));
 	glob_stat.max = max;
@@ -137,6 +139,7 @@ int writefits(char *filename, size_t width, size_t height, BBox *imbox,
 				mirPar *mirror, float *data){
 	FNAME();
 	long naxes[2] = {width, height};
+	static char* newname = NULL;
 	char buf[80];
 	int ret = 1;
 	double dX, dY;
@@ -146,15 +149,13 @@ int writefits(char *filename, size_t width, size_t height, BBox *imbox,
 	}
 	time_t savetime = time(NULL);
 	fitsfile *fp;
-	get_stat(data, width*height);
 	assert(filename);
-	char* newname = MALLOC(char, strlen(filename + 2));
+	newname = realloc(newname, strlen(filename + 2));
 	sprintf(newname, "!%s", filename); // say cfitsio that file could be rewritten
 	TRYFITS(fits_create_file, &fp, newname);
 	TRYFITS(fits_create_img, fp, FLOAT_IMG, 2, naxes);
 	// FILE / Input file original name
 	WRITEKEY(TSTRING, "FILE", filename, "Input file original name");
-	free(newname);
 	WRITEKEY(TSTRING, "DETECTOR", "Hartmann model", "Detector model");
 	if(imbox){
 		snprintf(buf, 79, "%.2g x %.2g", dX * 1e6, dY * 1e6);
@@ -198,6 +199,7 @@ int writefits(char *filename, size_t width, size_t height, BBox *imbox,
 		WRITEKEY(TFLOAT, "Z",        &mirror->objZ, "Object's zenith distance");
 		WRITEKEY(TFLOAT, "FOCUS",    &mirror->foc,  "Z-coordinate of light receiver");
 	}
+
 	TRYFITS(fits_write_img, fp, TFLOAT, 1, width * height, data);
 	TRYFITS(fits_close_file, fp);
 
@@ -212,13 +214,12 @@ uint8_t *processRow(float *irow, size_t width, float min, float wd){
 	rowptr = MALLOC(uint8_t, width * 3);
 	OMP_FOR()
 	for(size_t i = 0; i < width; i++){
-		//*ptr = (uint16_t)(umax*(*irow - min)/wd);
 		double gray = ((double)(irow[i] - min))/((double)wd);
 		if(gray == 0.) continue;
 		int G = (int)(gray * 4.);
 		double x = 4.*gray - (double)G;
-		uint8_t r = 0, g = 0, b = 0;
 		uint8_t *ptr = &rowptr[i*3];
+		uint8_t r = 0, g = 0, b = 0;
 		switch(G){
 			case 0:
 				g = (uint8_t)(255. * x + 0.5);
@@ -253,7 +254,6 @@ int writepng(char *filename, size_t width, size_t height, BBox *imbox,
 	FILE *fp = NULL;
 	png_structp pngptr = NULL;
 	png_infop infoptr = NULL;
-	get_stat(data, width*height);
 	float min = glob_stat.min, wd = glob_stat.max - min;
 	float *row;
 
@@ -297,7 +297,6 @@ int writejpg(char *filename, size_t width, size_t height, BBox *imbox,
 	FNAME();
 	int ret = 1;
 #if defined __JPEG && __JPEG == TRUE
-	get_stat(data, width*height);
 	float min = glob_stat.min, wd = glob_stat.max - min;
 	float *row;
 	FILE* outfile = fopen(filename, "w");
@@ -337,7 +336,6 @@ int writetiff(char *filename, size_t width, size_t height, BBox *imbox,
 	FNAME();
 	int ret = 1;
 #if defined __TIFF && __TIFF == TRUE
-	get_stat(data, width*height);
 	float min = glob_stat.min, wd = glob_stat.max - min;
 	float *row;
 	TIFF *image = TIFFOpen(filename, "w");
@@ -399,6 +397,7 @@ int writeimg(char *name, imtype t, size_t width, size_t height, BBox *imbox,
 	char *filename = NULL, *suffix;
 	int ret = 0;
 	itsuff *suf = suffixes;
+	get_stat(data, width*height);
 	while(t && suf->t){
 		if(!(t & suf->t)){
 			suf++;
@@ -406,18 +405,17 @@ int writeimg(char *name, imtype t, size_t width, size_t height, BBox *imbox,
 		}
 		t ^= suf->t;
 		suffix = suf->s;
-		FREE(filename);
 		if(name)
 			filename = createfilename(name, suffix);
 		else
 			filename = createfilename("out", suffix);
+		DBG("Filename: %s", filename);
 		if(!filename){
 			fprintf(stderr, "Create file with name %s and suffix %s failed,\n", name, suffix);
-			perror("can't make filename");
 			continue;
 		}
 		if(suf->writefn(filename, width, height, imbox, mirror, data)) ret++;
+		FREE(filename);
 	}
-	FREE(filename);
 	return ret;
 }

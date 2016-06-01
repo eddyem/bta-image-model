@@ -1,5 +1,5 @@
 /*
- * parceargs.c - parcing command line arguments & print help
+ * parseargs.c - parsing command line arguments & print help
  *
  * Copyright 2013 Edward V. Emelianoff <eddy@sao.ru>
  *
@@ -19,26 +19,17 @@
  * MA 02110-1301, USA.
  */
 
-#include <stdio.h>	// DBG
+#include <stdio.h>	// printf
 #include <getopt.h>	// getopt_long
 #include <stdlib.h>	// calloc, exit, strtoll
 #include <assert.h>	// assert
 #include <string.h> // strdup, strchr, strlen
+#include <strings.h>// strcasecmp
 #include <limits.h> // INT_MAX & so on
 #include <libintl.h>// gettext
 #include <ctype.h>	// isalpha
-#include "parceargs.h"
-
-#ifdef EBUG
-	#define DBG(...) printf(__VA_ARGS__)
-#else
-	#define DBG(...)
-#endif
-
-// macro to print help messages
-#ifndef PRNT
-	#define PRNT(x) gettext(x)
-#endif
+#include "parseargs.h"
+#include "usefull_macros.h"
 
 char *helpstring = "%s\n";
 
@@ -47,7 +38,6 @@ char *helpstring = "%s\n";
  * MAY consist ONE "%s" for progname
  * @param str (i) - new format
  */
-
 void change_helpstring(char *s){
 	int pcount = 0, scount = 0;
 	char *str = s;
@@ -61,13 +51,11 @@ void change_helpstring(char *s){
 		}
 		if(str[1] == 's') scount++; // increment "%s" counter
 	};
-	DBG("pc: %d, sc: %d\n", pcount, scount);
 	if(pcount > 1 || pcount != scount){ // amount of pcount and/or scount wrong
-		fprintf(stderr, "Wrong helpstring!\n");
-		exit(-1);
+		/// "Неправильный формат строки помощи"
+		ERRX(_("Wrong helpstring!"));
 	}
 	helpstring = s;
-	DBG("hs: %s\n", helpstring);
 }
 
 /**
@@ -77,7 +65,7 @@ void change_helpstring(char *s){
  * @param t   (i) - T_INT for integer or T_LLONG for long long (if argtype would be wided, may add more)
  * @return TRUE if conversion sone without errors, FALSE otherwise
  */
-bool myatoll(void *num, char *str, argtype t){
+static bool myatoll(void *num, char *str, argtype t){
 	long long tmp, *llptr;
 	int *iptr;
 	char *endptr;
@@ -94,7 +82,8 @@ bool myatoll(void *num, char *str, argtype t){
 		case arg_int:
 		default:
 			if(tmp < INT_MIN || tmp > INT_MAX){
-				fprintf(stderr, "Integer out of range\n");
+				/// "Целое вне допустимого диапазона"
+				WARNX(_("Integer out of range"));
 				return FALSE;
 			}
 			iptr = (int*)num;
@@ -105,7 +94,7 @@ bool myatoll(void *num, char *str, argtype t){
 
 // the same as myatoll but for double
 // There's no NAN & INF checking here (what if they would be needed?)
-bool myatod(void *num, const char *str, argtype t){
+static bool myatod(void *num, const char *str, argtype t){
 	double tmp, *dptr;
 	float *fptr;
 	char *endptr;
@@ -133,7 +122,7 @@ bool myatod(void *num, const char *str, argtype t){
  * @param options (i) - array of options
  * @return index in array
  */
-int get_optind(int opt, myoption *options){
+static int get_optind(int opt, myoption *options){
 	int oind;
 	myoption *opts = options;
 	assert(opts);
@@ -144,7 +133,57 @@ int get_optind(int opt, myoption *options){
 }
 
 /**
- * Parce command line arguments
+ * reallocate new value in array of multiple repeating arguments
+ * @arg paptr - address of pointer to array (**void)
+ * @arg type - its type (for realloc)
+ * @return pointer to new (next) value
+ */
+void *get_aptr(void *paptr, argtype type){
+	int i = 1;
+	void **aptr = *((void***)paptr);
+	if(aptr){ // there's something in array
+		void **p = aptr;
+		while(*p++) ++i;
+	}
+	size_t sz = 0;
+	switch(type){
+		default:
+		case arg_none:
+			/// "Не могу использовать несколько параметров без аргументов!"
+			ERRX("Can't use multiple args with arg_none!");
+		break;
+		case arg_int:
+			sz = sizeof(int);
+		break;
+		case arg_longlong:
+			sz = sizeof(long long);
+		break;
+		case arg_double:
+			sz = sizeof(double);
+		break;
+		case arg_float:
+			sz = sizeof(float);
+		break;
+		case arg_string:
+			sz = 0;
+		break;
+	/*	case arg_function:
+			sz = sizeof(argfn *);
+		break;*/
+	}
+	aptr = realloc(aptr, (i + 1) * sizeof(void*));
+	*((void***)paptr) = aptr;
+	aptr[i] = NULL;
+	if(sz){
+		aptr[i - 1] = malloc(sz);
+	}else
+		aptr[i - 1] = &aptr[i - 1];
+	return aptr[i - 1];
+}
+
+
+/**
+ * Parse command line arguments
  * ! If arg is string, then value will be strdup'ed!
  *
  * @param argc (io) - address of argc of main(), return value of argc stay after `getopt`
@@ -155,7 +194,7 @@ int get_optind(int opt, myoption *options){
  *
  * @exit: in case of error this function show help & make `exit(-1)`
   */
-void parceargs(int *argc, char ***argv, myoption *options){
+void parseargs(int *argc, char ***argv, myoption *options){
 	char *short_options, *soptr;
 	struct option *long_options, *loptr;
 	size_t optsize, i;
@@ -169,10 +208,18 @@ void parceargs(int *argc, char ***argv, myoption *options){
 	short_options = calloc(optsize * 3 + 1, 1); // multiply by three for '::' in case of args in opts
 	long_options = calloc(optsize + 1, sizeof(struct option));
 	opts = options; loptr = long_options; soptr = short_options;
+	// in debug mode check the parameters are not repeated
+#ifdef EBUG
+	char **longlist = MALLOC(char*, optsize);
+	char *shortlist = MALLOC(char, optsize);
+#endif
 	// fill short/long parameters and make a simple checking
 	for(i = 0; i < optsize; i++, loptr++, opts++){
 		// check
 		assert(opts->name); // check name
+#ifdef EBUG
+		longlist[i] = strdup(opts->name);
+#endif
 		if(opts->has_arg){
 			assert(opts->type != arg_none); // check error with arg type
 			assert(opts->argptr);  // check pointer
@@ -182,18 +229,47 @@ void parceargs(int *argc, char ***argv, myoption *options){
 		// fill long_options
 		// don't do memcmp: what if there would be different alignment?
 		loptr->name		= opts->name;
-		loptr->has_arg	= opts->has_arg;
+		loptr->has_arg	= (opts->has_arg < MULT_PAR) ? opts->has_arg : 1;
 		loptr->flag		= opts->flag;
 		loptr->val		= opts->val;
 		// fill short options if they are:
 		if(!opts->flag){
+#ifdef EBUG
+			shortlist[i] = (char) opts->val;
+#endif
 			*soptr++ = opts->val;
-			if(opts->has_arg) // add ':' if option has required argument
+			if(loptr->has_arg) // add ':' if option has required argument
 				*soptr++ = ':';
-			if(opts->has_arg == 2) // add '::' if option has optional argument
+			if(loptr->has_arg == 2) // add '::' if option has optional argument
 				*soptr++ = ':';
 		}
 	}
+	// sort all lists & check for repeating
+#ifdef EBUG
+	int cmpstringp(const void *p1, const void *p2){
+		return strcmp(* (char * const *) p1, * (char * const *) p2);
+	}
+	int cmpcharp(const void *p1, const void *p2){
+		return (int)(*(char * const)p1 - *(char *const)p2);
+	}
+	qsort(longlist, optsize, sizeof(char *), cmpstringp);
+	qsort(shortlist,optsize, sizeof(char), cmpcharp);
+	char *prevl = longlist[0], prevshrt = shortlist[0];
+	for(i = 1; i < optsize; ++i){
+		if(longlist[i]){
+			if(prevl){
+				if(strcmp(prevl, longlist[i]) == 0) ERRX("double long arguments: --%s", prevl);
+			}
+			prevl = longlist[i];
+		}
+		if(shortlist[i]){
+			if(prevshrt){
+				if(prevshrt == shortlist[i]) ERRX("double short arguments: -%c", prevshrt);
+			}
+			prevshrt = shortlist[i];
+		}
+	}
+#endif
 	// now we have both long_options & short_options and can parse `getopt_long`
 	while(1){
 		int opt;
@@ -202,60 +278,76 @@ void parceargs(int *argc, char ***argv, myoption *options){
 		if(opt == '?'){
 			opt = optopt;
 			optind = get_optind(opt, options);
-			if(options[optind].has_arg == 1) showhelp(optind, options); // need argument
+			if(options[optind].has_arg == NEED_ARG || options[optind].has_arg == MULT_PAR)
+				showhelp(optind, options); // need argument
 		}
 		else{
 			if(opt == 0 || oindex > 0) optind = oindex;
 			else optind = get_optind(opt, options);
 		}
 		opts = &options[optind];
-DBG ("\n*******\noption %s (oindex = %d / optind = %d)", options[optind].name, oindex, optind);
-if(optarg) DBG (" with arg %s", optarg);
-DBG ("\n");
-		if(opt == 0 && opts->has_arg == 0) continue; // only long option changing integer flag
-DBG("opt = %c, arg type: ", opt);
+		if(opt == 0 && opts->has_arg == NO_ARGS) continue; // only long option changing integer flag
 		// now check option
-		if(opts->has_arg == 1) assert(optarg);
+		if(opts->has_arg == NEED_ARG || opts->has_arg == MULT_PAR)
+			if(!optarg) showhelp(optind, options); // need argument
+		void *aptr;
+		if(opts->has_arg == MULT_PAR){
+			aptr = get_aptr(opts->argptr, opts->type);
+		}else
+			aptr = opts->argptr;
 		bool result = TRUE;
 		// even if there is no argument, but argptr != NULL, think that optarg = "1"
 		if(!optarg) optarg = "1";
 		switch(opts->type){
 			default:
 			case arg_none:
-DBG("none\n");
+				if(opts->argptr) *((int*)aptr) += 1; // increment value
 			break;
 			case arg_int:
-DBG("integer\n");
-				result = myatoll(opts->argptr, optarg, arg_int);
+				result = myatoll(aptr, optarg, arg_int);
 			break;
 			case arg_longlong:
-DBG("long long\n");
-				result = myatoll(opts->argptr, optarg, arg_longlong);
+				result = myatoll(aptr, optarg, arg_longlong);
 			break;
 			case arg_double:
-DBG("double\n");
-				result = myatod(opts->argptr, optarg, arg_double);
+				result = myatod(aptr, optarg, arg_double);
 			break;
 			case arg_float:
-DBG("double\n");
-				result = myatod(opts->argptr, optarg, arg_float);
+				result = myatod(aptr, optarg, arg_float);
 			break;
 			case arg_string:
-DBG("string\n");
-				result = (*((char **)opts->argptr) = strdup(optarg));
+				result = (*((void**)aptr) = (void*)strdup(optarg));
 			break;
 			case arg_function:
-DBG("function\n");
-				result = ((argfn)opts->argptr)(optarg, optind);
+				result = ((argfn)aptr)(optarg);
 			break;
 		}
 		if(!result){
-DBG("OOOPS! Error in result\n");
 			showhelp(optind, options);
 		}
 	}
 	*argc -= optind;
 	*argv += optind;
+}
+
+/**
+ * compare function for qsort
+ * first - sort by short options; second - sort arguments without sort opts (by long options)
+ */
+static int argsort(const void *a1, const void *a2){
+	const myoption *o1 = (myoption*)a1, *o2 = (myoption*)a2;
+	const char *l1 = o1->name, *l2 = o2->name;
+	int s1 = o1->val, s2 = o2->val;
+	int *f1 = o1->flag, *f2 = o2->flag;
+	// check if both options has short arg
+	if(f1 == NULL && f2 == NULL){ // both have short arg
+		return (s1 - s2);
+	}else if(f1 != NULL && f2 != NULL){ // both don't have short arg - sort by long
+		return strcmp(l1, l2);
+	}else{ // only one have short arg -- return it
+		if(f2) return -1; // a1 have short - it is 'lesser'
+		else return 1;
+	}
 }
 
 /**
@@ -266,8 +358,6 @@ DBG("OOOPS! Error in result\n");
  * @exit:  run `exit(-1)` !!!
  */
 void showhelp(int oindex, myoption *options){
-	// ATTENTION: string `help` prints through macro PRNT(), bu default it is gettext,
-	// but you can redefine it before `#include "parceargs.h"`
 	int max_opt_len = 0; // max len of options substring - for right indentation
 	const int bufsz = 255;
 	char buf[bufsz+1];
@@ -281,7 +371,7 @@ void showhelp(int oindex, myoption *options){
 		printf("--%s", opts->name);
 		if(opts->has_arg == 1) printf("=arg");
 		else if(opts->has_arg == 2) printf("[=arg]");
-		printf("  %s\n", PRNT(opts->help));
+		printf("  %s\n", _(opts->help));
 		exit(-1);
 	}
 	// header, by default is just "progname\n"
@@ -298,10 +388,15 @@ void showhelp(int oindex, myoption *options){
 	}while((++opts)->name);
 	max_opt_len += 14; // format: '-S , --long[=arg]' - get addition 13 symbols
 	opts = options;
-	// Now print all help
+	// count amount of options
+	int N; for(N = 0; opts->name; ++N, ++opts);
+	if(N == 0) exit(-2);
+	// Now print all help (sorted)
+	opts = options;
+	qsort(opts, N, sizeof(myoption), argsort);
 	do{
 		int p = sprintf(buf, "  "); // a little indent
-		if(!opts->flag && isalpha(opts->val)) // .val is short argument
+		if(!opts->flag) // .val is short argument
 			p += snprintf(buf+p, bufsz-p, "-%c, ", opts->val);
 		p += snprintf(buf+p, bufsz-p, "--%s", opts->name);
 		if(opts->has_arg == 1) // required argument
@@ -309,8 +404,94 @@ void showhelp(int oindex, myoption *options){
 		else if(opts->has_arg == 2) // optional argument
 			p += snprintf(buf+p, bufsz-p, "[=arg]");
 		assert(p < max_opt_len); // there would be magic if p >= max_opt_len
-		printf("%-*s%s\n", max_opt_len+1, buf, PRNT(opts->help)); // write options & at least 2 spaces after
-	}while((++opts)->name);
+		printf("%-*s%s\n", max_opt_len+1, buf, _(opts->help)); // write options & at least 2 spaces after
+		++opts;
+	}while(--N);
 	printf("\n\n");
 	exit(-1);
+}
+
+/**
+ * get suboptions from parameter string
+ * @param str - parameter string
+ * @param opt - pointer to suboptions structure
+ * @return TRUE if all OK
+ */
+bool get_suboption(char *str, mysuboption *opt){
+	int findsubopt(char *par, mysuboption *so){
+		int idx = 0;
+		if(!par) return -1;
+		while(so[idx].name){
+			if(strcasecmp(par, so[idx].name) == 0) return idx;
+			++idx;
+		}
+		return -1; // badarg
+	}
+	bool opt_setarg(mysuboption *so, int idx, char *val){
+		mysuboption *soptr = &so[idx];
+		bool result = FALSE;
+		void *aptr = soptr->argptr;
+		switch(soptr->type){
+			default:
+			case arg_none:
+				if(soptr->argptr) *((int*)aptr) += 1; // increment value
+				result = TRUE;
+			break;
+			case arg_int:
+				result = myatoll(aptr, val, arg_int);
+			break;
+			case arg_longlong:
+				result = myatoll(aptr, val, arg_longlong);
+			break;
+			case arg_double:
+				result = myatod(aptr, val, arg_double);
+			break;
+			case arg_float:
+				result = myatod(aptr, val, arg_float);
+			break;
+			case arg_string:
+				result = (*((void**)aptr) = (void*)strdup(val));
+			break;
+			case arg_function:
+				result = ((argfn)aptr)(val);
+			break;
+		}
+		return result;
+	}
+	char *tok;
+	bool ret = FALSE;
+	char *tmpbuf;
+	tok = strtok_r(str, ":,", &tmpbuf);
+	do{
+		char *val = strchr(tok, '=');
+		int noarg = 0;
+		if(val == NULL){ // no args
+			val = "1";
+			noarg = 1;
+		}else{
+			*val++ = '\0';
+			if(!*val || *val == ':' || *val == ','){ // no argument - delimeter after =
+				val = "1"; noarg = 1;
+			}
+		}
+		int idx = findsubopt(tok, opt);
+		if(idx < 0){
+			/// "Неправильный параметр: %s"
+			WARNX(_("Wrong parameter: %s"), tok);
+			goto returning;
+		}
+		if(noarg && opt[idx].has_arg == NEED_ARG){
+			/// "%s: необходим аргумент!"
+			WARNX(_("%s: argument needed!"), tok);
+			goto returning;
+		}
+		if(!opt_setarg(opt, idx, val)){
+			/// "Неправильный аргумент \"%s\" параметра \"%s\""
+			WARNX(_("Wrong argument \"%s\" of parameter \"%s\""), val, tok);
+			goto returning;
+		}
+	}while((tok = strtok_r(NULL, ":,", &tmpbuf)));
+	ret = TRUE;
+returning:
+	return ret;
 }

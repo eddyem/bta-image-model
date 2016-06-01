@@ -32,6 +32,7 @@
 #define EXTERN extern "C"
 #define CUDA_CU
 #include "mkHartmann.h"
+#include "usefull_macros.h"
 #include "wrapper.h"
 
 int SHMEMSZ = 16383; // default constants, changed runtime
@@ -102,7 +103,7 @@ static int ret;
 	if(CUERROR("CUDA: can't copy data to device")){\
 		FREERETMACRO;							\
 }}while(0)
-#define CUFREE(var) do{cudaFree(var); var = NULL; }while(0)
+#define CUFREE(var) do{if(var){cudaFree(var); var = NULL; }}while(0)
 #define  CUFFTCALL(fn)		do{					\
 	cufftResult fres = fn;						\
 	if(CUFFT_SUCCESS != fres){					\
@@ -420,11 +421,12 @@ free_all:
  */
 // 1./sqrt(2)
 #define DIVSQ2  0.7071068f
-// 2*(1+2/sqrt(2))
-#define WEIGHT 482.842712f
+// 2*(1+2/sqrt(2)) -- (1+2/sqrt(2)) taken from linear gradient:
+//         1 = (2 + 4/sqrt(2)) / (2*x) ==> x = 1 + 2/sqrt(2)
+#define WEIGHT 4.82842712f
 __global__ void calcMir_dXdY(size_t Sz, float mirPixSZ,
 					float *dZdX, float *dZdY){
-	#define TEX(X,Y) tex2D(TEXTURE(), X0+(X), Y0+(Y))*100.f
+	#define TEX(X,Y) tex2D(TEXTURE(), X0+(X), Y0+(Y))
 	#define PAIR(X,Y)  (TEX((X),(Y))-TEX(-(X),-(Y)))
 	int X0,Y0;
 	X0 = threadIdx.x + blockDim.x * blockIdx.x;
@@ -445,9 +447,10 @@ __global__ void calcMir_dXdY(size_t Sz, float mirPixSZ,
  * Compute matrices of mirror surface deviation
  * @param map, mapWH - square matrix of surface deviations (in meters) and its size
  * @param mirDia - mirror diameter
- * @param mirWH - size of output square matrices (mirWH x mirWH)
- * @param mirZ  - matrix of mirror Z variations (add to mirror Z)
- * @param mirDX, mirDY - partial derivatives dZ/dx & dZ/dy (add to mirror der.)
+ * @param mirDev - deviations:
+ * 		.mirWH - size of output square matrices (mirWH x mirWH)
+ * 		.mirZ  - matrix of mirror Z variations (add to mirror Z)
+ * 		.mirDX, .mirDY - partial derivatives dZ/dx & dZ/dy (add to mirror der.)
  * @return 0 if fails
  */
 EXTERN int CUmkmirDeviat(float *map, size_t mapWH, float mirDia,
@@ -529,9 +532,8 @@ typedef struct{
  * 				 in: coordinates in diapazone [0,1)
  * @param photonSZ - size of prevoius arrays
  * @param Z0 - Z-coordinate of image plane
- * @param M - mirror rotation matrix or NULL if rotation is absent
+ * @param mpb - rotmatrix, mirror parameters, bbox where photons falling and diaphragm
  * @param mir_WH - mirror derivations matrix size
- * @param Parms - mirror parameters
  * @param f - light direction vector
  *
  * @param holes - array with
@@ -547,15 +549,15 @@ __global__ void getXY(float *photonX, float *photonY, size_t photonSZ,
 	BBox *box = &mpb->B;
 	float _2F = Parms->F * 2.f, R = Parms->D / 2.f;
 	float x,y,z; // coordinates on mirror in meters
-	x = box->x0 + photonX[IDX] * box->w; // coords of photons
+	x = box->x0 + photonX[IDX] * box->w; // coords of photons on mirror
 	y = box->y0 + photonY[IDX] * box->h;
 	float r2 = x*x + y*y;
 	z = r2 / _2F / 2.f;
 	// we don't mean large inclination so check border by non-inclinated mirror
 	if(r2 > R*R) BADPHOTON();
-	float pixSZ = Parms->D / float(mir_WH-1); // "pixel" size on mirror
+	float pixSZ = Parms->D / float(mir_WH-1); // "pixel" size on mirror's normales matrix
 	// coordinates on deviation matrix, don't forget about y-mirroring!
-	float xOnMat = (x + R) / pixSZ, yOnMat = (R - y) / pixSZ;
+	float xOnMat = (x + R) / pixSZ, yOnMat = (y + R) / pixSZ; //yOnMat = (R - y) / pixSZ;
 	// now add z-deviations, linear interpolation of pre-computed matrix
 	z += tex2D(TZ, xOnMat, yOnMat);
 	// point on unrotated mirror
@@ -576,17 +578,18 @@ __global__ void getXY(float *photonX, float *photonY, size_t photonSZ,
 	float K;
 	if(mpb->D.Nholes){ // there is a diaphragm - test it
 		Diaphragm *D = &(mpb->D);
-		int S = D->mask->WH; // size of diaphragm matrix
+		int S = D->mask->WH; // size of matrix mask
+		pixSZ = Parms->D / (float)S;
 		K = (D->Z - point.z) / refl.z; // scale to convert normal to vector
-		float xleft = D->box.x0, ybot = D->box.y0; // left bottom angle of dia box
-		float scalex = D->box.w/(float)S, scaley = D->box.h/(float)S;
-		x = point.x + K*refl.x;
-		y = point.y + K*refl.y;
-		int curX = (int)((x - xleft) / scalex + 0.5f); // coords on dia matrix
-		int curY = (int)((y - ybot) / scaley + 0.5f);
+		//float xleft = D->box.x0, ybot = D->box.y0; // left bottom angle of dia box
+		//float scalex = D->box.w/(float)S, scaley = D->box.h/(float)S;
+		int curX = (int)((x + R) / pixSZ + 0.5f); // coords on mirror mask
+		int curY = (int)((y + R) / pixSZ + 0.5f);
 		if(curX < 0 || curX >= S || curY < 0 || curY >= S) BADPHOTON();
 		uint16_t mark = D->mask->data[curY*S + curX];
 		if(!mark) BADPHOTON();
+		x = point.x + K*refl.x; // coords on diaphragm
+		y = point.y + K*refl.y;
 		do{
 			int t = D->holes[mark-1].type;
 			BBox *b = &D->holes[mark-1].box;
@@ -699,7 +702,8 @@ EXTERN int CUgetPhotonXY(float *xout, float *yout, int R, mirDeviations *D,
 		Diaphragm tmpd;
 		mirMask tmpM;
 		memcpy(&tmpd, mirParms->dia, sizeof(Diaphragm));
-		memcpy(&tmpM, mirParms->dia->mask, sizeof(mirMask));
+		//memcpy(&tmpM, mirParms->dia->mask, sizeof(mirMask));
+		tmpM.WH = mirParms->dia->mask->WH;
 		size_t S = sizeof(aHole) * mirParms->dia->Nholes;
 		CUALLOC(hdev, S);
 		CUMOV2DEV(hdev, mirParms->dia->holes, S);

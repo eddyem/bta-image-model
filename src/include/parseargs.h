@@ -1,5 +1,5 @@
 /*
- * parceargs.h - headers for parcing command line arguments
+ * parseargs.h - headers for parsing command line arguments
  *
  * Copyright 2013 Edward V. Emelianoff <eddy@sao.ru>
  *
@@ -19,10 +19,11 @@
  * MA 02110-1301, USA.
  */
 #pragma once
-#ifndef __PARCEARGS_H__
-#define __PARCEARGS_H__
+#ifndef __PARSEARGS_H__
+#define __PARSEARGS_H__
 
 #include <stdbool.h>// bool
+#include <stdlib.h>
 
 #ifndef TRUE
 	#define TRUE true
@@ -36,7 +37,7 @@
 #define APTR(x)   ((void*)x)
 
 // if argptr is a function:
-typedef  bool(*argfn)(void *arg, int N);
+typedef  bool(*argfn)(void *arg);
 
 /*
  * type of getopt's argument
@@ -47,7 +48,7 @@ typedef  bool(*argfn)(void *arg, int N);
  * 		int iarg;
  * 		myoption opts[] = {
  * 		{"value", 1, NULL, 'v', arg_int, &iarg, "char val"}, ..., end_option};
- * 		..(parce args)..
+ * 		..(parse args)..
  * 		charg = (char) iarg;
  */
 typedef enum {
@@ -57,7 +58,7 @@ typedef enum {
 	arg_double,		// double
 	arg_float,		// float
 	arg_string,		// char *
-	arg_function	// parce_args will run function `bool (*fn)(char *optarg, int N)`
+	arg_function	// parse_args will run function `bool (*fn)(char *optarg, int N)`
 } argtype;
 
 /*
@@ -66,7 +67,7 @@ typedef enum {
  * 		conversion depends on .type
  *
  * ATTENTION: string `help` prints through macro PRNT(), bu default it is gettext,
- * but you can redefine it before `#include "parceargs.h"`
+ * but you can redefine it before `#include "parseargs.h"`
  *
  * if arg is string, then value wil be strdup'ed like that:
  * 		char *str;
@@ -79,26 +80,45 @@ typedef enum {
  * !!!LAST VALUE OF ARRAY SHOULD BE `end_option` or ZEROS !!!
  *
  */
+typedef enum{
+	NO_ARGS  = 0,  // first three are the same as in getopt_long
+	NEED_ARG = 1,
+	OPT_ARG  = 2,
+	MULT_PAR
+} hasarg;
+
 typedef struct{
 	// these are from struct option:
 	const char *name;		// long option's name
-	int         has_arg;	// 0 - no args, 1 - nesessary arg, 2 - optionally arg
+	hasarg      has_arg;	// 0 - no args, 1 - nesessary arg, 2 - optionally arg, 4 - need arg & key can repeat (args are stored in null-terminated array)
 	int        *flag;		// NULL to return val, pointer to int - to set its value of val (function returns 0)
 	int         val;		// short opt name (if flag == NULL) or flag's value
 	// and these are mine:
 	argtype     type;		// type of argument
 	void       *argptr;		// pointer to variable to assign optarg value or function `bool (*fn)(char *optarg, int N)`
-	char       *help;		// help string which would be shown in function `showhelp` or NULL
+	const char *help;		// help string which would be shown in function `showhelp` or NULL
 } myoption;
+
+/*
+ * Suboptions structure, almost the same like myoption
+ * used in parse_subopts()
+ */
+typedef struct{
+	const char *name;
+	hasarg      has_arg;
+	argtype     type;
+	void       *argptr;
+} mysuboption;
 
 // last string of array (all zeros)
 #define end_option {0,0,0,0,0,0,0}
-
+#define end_suboption {0,0,0,0}
 
 extern const char *__progname;
 
 void showhelp(int oindex, myoption *options);
-void parceargs(int *argc, char ***argv, myoption *options);
+void parseargs(int *argc, char ***argv, myoption *options);
 void change_helpstring(char *s);
+bool get_suboption(char *str, mysuboption *opt);
 
-#endif // __PARCEARGS_H__
+#endif // __PARSEARGS_H__

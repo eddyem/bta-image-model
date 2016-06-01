@@ -23,7 +23,7 @@
 #ifndef __CMDLNOPTS_H__
 #define __CMDLNOPTS_H__
 
-#include "parceargs.h"
+#include "parseargs.h"
 #include "mkHartmann.h"
 #include "saveimg.h"
 
@@ -32,10 +32,15 @@ typedef struct{
 	int S_interp;	// size of interpolated S0
 	int S_image;	// resulting image size
 	int N_phot;		// amount of photons falled to one pixel of S1 by one iteration
+	int N_iter;		// iterations number
 	int randMask;	// add to mask random numbers
 	float randAmp;	// amplitude of added random noice
+	float CCDW;		// CCD width
+	float CCDH;		//           and height (in millimeters)
 	imtype it;		// output image type
 	char *dev_filename;// input deviations file name
+	char *holes_filename;// input holes file name
+	char *outfile;	// output file name
 	mirPar *Mirror;	// mirror parameters
 } glob_pars;
 
@@ -43,6 +48,6 @@ typedef struct{
 extern glob_pars const Gdefault;
 extern mirPar const Mdefault;
 
-glob_pars *parce_args(int argc, char **argv);
+glob_pars *parse_args(int argc, char **argv);
 
 #endif // __CMDLNOPTS_H__

@@ -1,0 +1,4 @@
+.hg*
+*.tgz
+*~
+.dropbox.attr

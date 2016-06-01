@@ -61,12 +61,6 @@
 	#define LOCALEDIR "/usr/share/locale/"
 #endif
 
-#define _(String)				gettext(String)
-#define gettext_noop(String)	String
-#define N_(String)				gettext_noop(String)
-
-#define _U_    __attribute__((__unused__))
-
 #ifndef THREAD_NUMBER
 	#define THREAD_NUMBER 2
 #endif
@@ -80,27 +74,6 @@
 #else
 	#define OMP_FOR(x)
 #endif // OMP
-
-extern int globErr;
-#define ERR(...) do{globErr=errno; _WARN(__VA_ARGS__); exit(-1);}while(0)
-#define ERRX(...) do{globErr=0; _WARN(__VA_ARGS__); exit(-1);}while(0)
-#define WARN(...) do{globErr=errno; _WARN(__VA_ARGS__);}while(0)
-#define WARNX(...) do{globErr=0; _WARN(__VA_ARGS__);}while(0)
-
-// debug mode, -DEBUG
-#ifdef EBUG
-	#define FNAME() fprintf(stderr, "\n%s (%s, line %d)\n", __func__, __FILE__, __LINE__)
-	#define DBG(...) do{fprintf(stderr, "%s (%s, line %d): ", __func__, __FILE__, __LINE__); \
-					fprintf(stderr, __VA_ARGS__);			\
-					fprintf(stderr, "\n");} while(0)
-#else
-	#define FNAME()	 do{}while(0)
-	#define DBG(...) do{}while(0)
-#endif //EBUG
-
-#define ALLOC(type, var, size)  type * var = ((type *)my_alloc(size, sizeof(type)))
-#define MALLOC(type, size) ((type *)my_alloc(size, sizeof(type)))
-#define FREE(ptr)			do{free(ptr); ptr = NULL;}while(0)
 
 #ifndef EXTERN  // file wasn't included from CUDA.cu
 	#define EXTERN extern

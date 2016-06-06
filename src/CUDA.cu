@@ -419,11 +419,6 @@ free_all:
  * First check point on a mask plane; if photon falls to a hole in mask, increment
  * value on corresponding image pixel
  */
-// 1./sqrt(2)
-#define DIVSQ2  0.7071068f
-// 2*(1+2/sqrt(2)) -- (1+2/sqrt(2)) taken from linear gradient:
-//         1 = (2 + 4/sqrt(2)) / (2*x) ==> x = 1 + 2/sqrt(2)
-#define WEIGHT 4.82842712f
 __global__ void calcMir_dXdY(size_t Sz, float mirPixSZ,
 					float *dZdX, float *dZdY){
 	#define TEX(X,Y) tex2D(TEXTURE(), X0+(X), Y0+(Y))
@@ -435,7 +430,7 @@ __global__ void calcMir_dXdY(size_t Sz, float mirPixSZ,
 	if(X0 >= Sz || Y0 >= Sz) return;
 	// calculate gradient components
 	int idx = Y0 * Sz + X0;
-	mirPixSZ *= WEIGHT;
+	mirPixSZ *= GRAD_WEIGHT;
 	dZdX[idx] = (PAIR(1,0) + DIVSQ2*(PAIR(1,-1)+PAIR(1,1)))/mirPixSZ;
 	// REMEMBER!!! Axe Y looks up, so we must change the sign
 	dZdY[idx] = -(PAIR(0,1) + DIVSQ2*(PAIR(1,1)+PAIR(-1,1)))/mirPixSZ;
@@ -639,22 +634,26 @@ EXTERN int CUgetPhotonXY(float *xout, float *yout, int R, mirDeviations *D,
 	mirMask *mmdev = NULL;
 	uint16_t *mdatadev = NULL;
 	float *X = NULL, *Y = NULL;
-	float SZ = sin(mirParms->objZ);
+	//float SZ = sin(mirParms->objZ);
 	float z = mirParms->foc;
 	float *Z_dev = NULL, *dX_dev = NULL, *dY_dev = NULL;
-	float A = mirParms->Aincl, Z = mirParms->Zincl;
+	float A = mirParms->Aincl, Z = -mirParms->Zincl;
 	size_t H = D->mirWH, Wp = H*sizeof(float), pitch;
 	float cA = cos(A), sA = sin(A), cZ = cos(Z), sZ = sin(Z);
 	size_t sz = N_photons * sizeof(float);
 	size_t dimens = (N_photons+LBLKSZ-1)/LBLKSZ;
 	// light direction vector
-	float3 f = make_float3(-SZ*sin(mirParms->objA), -SZ*cos(mirParms->objA), -cos(mirParms->objZ));
+	//float3 f = make_float3(-SZ*sin(mirParms->objA), -SZ*cos(mirParms->objA), -cos(mirParms->objZ));
+	float3 f = make_float3(-sin(mirParms->objA), -sin(mirParms->objZ), -1.);
 	// rotation matrix by Z than by A:
 	Matrix M, *Mptr = NULL;
-	if(A != 0.f || Z != 0.f){
-		M.l1 = make_float3(cA, sA*cZ, sA*sZ);
+	if((fabs(A) > FLT_EPSILON) || (fabs(Z) > FLT_EPSILON)){
+		/*M.l1 = make_float3(cA, sA*cZ, sA*sZ);
 		M.l2 = make_float3(-sA, cA*cZ, cA*sZ);
-		M.l3 = make_float3(0.f, -sZ, cZ);
+		M.l3 = make_float3(0.f, -sZ, cZ);*/
+		M.l1 = make_float3(cA, 0.f, sA);
+		M.l2 = make_float3(sA*sZ, cZ, -sZ*cA);
+		M.l3 = make_float3(-sA*cZ, sZ, cZ*cA);
 		Mptr = &M;
 	}
 	// textures for linear interpolation

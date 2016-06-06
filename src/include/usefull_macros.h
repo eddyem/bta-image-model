@@ -56,6 +56,13 @@
 // unused arguments with -Wall -Werror
 #define _U_    __attribute__((__unused__))
 
+#ifndef FLT_EPSILON
+#define  FLT_EPSILON  (1.1920928955078125e-07)
+#endif
+#ifndef DBL_EPSILON
+#define DBL_EPSILON  (2.2204460492503131e-16)
+#endif
+
 /*
  * Coloured messages output
  */

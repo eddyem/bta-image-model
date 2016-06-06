@@ -29,6 +29,12 @@
 
 #include "mkHartmann.h"
 
+// 1./sqrt(2)
+#define DIVSQ2  0.7071068f
+// 2*(1+2/sqrt(2)) -- (1+2/sqrt(2)) taken from linear gradient:
+//         1 = (2 + 4/sqrt(2)) / (2*x) ==> x = 1 + 2/sqrt(2)
+#define GRAD_WEIGHT 4.82842712f
+
 static const size_t MB = 1024*1024; // convert bytes to MB
 
 void noCUDA();

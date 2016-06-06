@@ -41,7 +41,7 @@ int CPUfillrandarr(size_t sz, float *arr, float Amp){
 		rand_initialized = 1;
 	}
 	size_t i;
-	OMP_FOR()
+	OMP_FOR(shared(arr))
 	for(i = 0; i < sz; i++)
 		arr[i] = (float)drand48() * Amp;
 	return 1;
@@ -109,13 +109,132 @@ int CPUmkmirDeviat(float *map, size_t mapWH, float mirDia,
 	FNAME();
 	size_t mirWH = mirDev->mirWH;
 	if(!CPUbicubic_interp(mirDev->mirZ,map,mirWH,mirWH,mapWH,mapWH)) return 0;
-	;
-	return 0;
+	float mirPixSZ = mirDia/((float)(mirWH-1)) * GRAD_WEIGHT;
+	float *dZdX = mirDev->mirDX, *dZdY = mirDev->mirDY, *Z = mirDev->mirZ;
+	int x, y, maxsz = mirWH - 1;
+	// simple mnemonics
+	size_t ul=-1-mirWH, ur=1-mirWH, dl=-1+mirWH, dr=1+mirWH, r=1, l=-1, u=-mirWH, d=mirWH;
+	OMP_FOR(shared(dZdX, dZdY, Z))
+	for(y = 1; y < maxsz; ++y){
+		size_t s = mirWH*y+1;
+		float *dzdx = &dZdX[s], *dzdy = &dZdY[s], *z = &Z[s];
+		for(x = 1; x < maxsz; ++x, ++dzdx, ++dzdy, ++z){
+			float dif1 = z[ur]-z[dl], dif2 = z[dr]-z[ul];
+			*dzdx = (z[r]-z[l] + DIVSQ2*(dif1 + dif2))/mirPixSZ;
+			// REMEMBER!!! Axe Y looks up, so we must change the sign
+			*dzdy = -(z[u]-z[d] + DIVSQ2*(dif1 - dif2))/mirPixSZ;
+		}
+	}
+	float *dzdx = dZdX, *dzdy = dZdY;
+	// now simply copy neighbours to top row and left column
+	for(x = 0; x < mirWH; ++x, ++dzdx, ++dzdy){
+		*dzdx = dzdx[mirWH]; *dzdy = dzdy[mirWH];
+	}
+	dzdx = dZdX, dzdy = dZdY;
+	for(y = 0; y < mirWH; ++y, dzdx+=mirWH, dzdy+=mirWH){
+		*dzdx = dzdx[1]; *dzdy = dzdy[1];
+	}
+	*dZdX = (dZdX[1]+dZdX[mirWH])/2;
+	*dZdY = (dZdY[1]+dZdY[mirWH])/2;
+	return 1;
 }
 
-int CPUgetPhotonXY(float *xout _U_, float *yout _U_, int R _U_ ,mirDeviations *D _U_,
-				mirPar *mirParms _U_, size_t N_photons _U_, BBox *box _U_){
+/**
+ * Don't use it: without linear interpolation the results are wrong!
+ */
+int CPUgetPhotonXY(float *xout, float *yout, int R, mirDeviations *D,
+				mirPar *mirParms, size_t N_photons, BBox *box){
 	FNAME();
 	return 0;
+	float z0 = mirParms->foc, SZ = sin(mirParms->objZ);
+	float F = mirParms->F, _2F = 2.f* F, Rmir = mirParms->D / 2.f, Rmir_2 = Rmir*Rmir;
+	float x0 = box->x0, y0 = box->y0, w = box->w, h = box->h;
+	int i;
+	if(R){ // create random arrays X & Y
+		CPUfillrandarr(N_photons, xout, 1.);
+		CPUfillrandarr(N_photons, yout, 1.);
+	}
+	float A = mirParms->Aincl, Z = mirParms->Zincl;
+	size_t mirWH = D->mirWH;
+	float cA, sA, cZ, sZ; // sin/cos A&Z
+	sincosf(A, &sA, &cA);
+	sincosf(Z, &sZ, &cZ);
+	// light direction vector
+	float f[3] = {-SZ*sinf(mirParms->objA), -SZ*cosf(mirParms->objA), -cosf(mirParms->objZ)};
+	int rot = 0;
+	if((fabs(A) > FLT_EPSILON) || (fabs(Z) > FLT_EPSILON)) rot = 1;
+	float pixSZ = mirParms->D / ((float)(mirWH-1)); // "pixel" size on mirror's normales matrix
+	OMP_FOR(shared(xout, yout))
+	for(i = 0; i < N_photons; ++i){
+		float x = x0 + xout[i] * w, y = y0 + yout[i] * h, r2 = x*x + y*y;
+		if(r2 > Rmir_2){xout[i] = 1e10f; yout[i] = 1e10f; continue;}
+		float z = r2 / F;
+		// coordinates on deviation matrix, don't forget about y-mirroring!
+		int xOnMat = (x + Rmir) / pixSZ, yOnMat = (y + R) / pixSZ; //yOnMat = (R - y) / pixSZ;
+		size_t idx = xOnMat + yOnMat * mirWH;
+		// now add z-deviations, nearest interpolation of pre-computed matrix
+		z += D->mirZ[idx];
+		float normal[3] = { D->mirDX[idx] - x/_2F, D->mirDY[idx] - y/_2F, 1.f};
+		float point[3] = {x, y, z};
+		void inline rotate(float Mat[3][3], float vec[3]){
+			float tmp[3] = {Mat[0][0]*vec[0]+Mat[0][1]*vec[1]+Mat[0][2]*vec[2],
+							Mat[1][0]*vec[0]+Mat[1][1]*vec[1]+Mat[1][2]*vec[2],
+							Mat[2][0]*vec[0]+Mat[2][1]*vec[1]+Mat[2][2]*vec[2]};
+			memmove(vec, tmp, 3*sizeof(float));
+		}
+		if(rot){ // rotate mirror
+			float M[3][3] = {{cA, sA*cZ, sA*sZ},  // rotation matrix
+				{-sA, cA*cZ, cA*sZ},
+				{0.f, -sZ, cZ}};
+			rotate(M, point);
+			rotate(M, normal);
+		}
+		// normalize normal
+		{float L = sqrtf(normal[0]*normal[0]+normal[1]*normal[1]+normal[2]*normal[2]);
+			normal[0] /= L; normal[1] /= L; normal[2] /= L;}
+		// calculate reflection direction vector
+		float fn = 2.f*fabs(f[0]*normal[0]+f[1]*normal[1]+f[2]*normal[2]);
+		float refl[3] = {fn*normal[0]+f[0], fn*normal[1]+f[1], fn*normal[2]+f[2]};
+		float K;
+		if(mirParms->dia && mirParms->dia->Nholes){ // there is a diaphragm - test it
+			Diaphragm *D = mirParms->dia;
+			int S = D->mask->WH; // size of matrix mask
+			pixSZ = mirParms->D / (float)S;
+			K = (D->Z - point[2]) / refl[2]; // scale to convert normal to vector
+			int curX = (int)((x + Rmir) / pixSZ + 0.5f); // coords on mirror mask
+			int curY = (int)((y + Rmir) / pixSZ + 0.5f);
+			if(curX < 0 || curX >= S || curY < 0 || curY >= S)
+				{xout[i] = 1e10f; yout[i] = 1e10f; continue;}
+			uint16_t mark = D->mask->data[curY*S + curX];
+			if(!mark){xout[i] = 1e10f; yout[i] = 1e10f; continue;}
+			x = point[0] + K*refl[0]; // coords on diaphragm
+			y = point[1] + K*refl[1];
+			do{
+				int t = D->holes[mark-1].type;
+				BBox *b = &D->holes[mark-1].box;
+				float rx = b->w/2.f, ry = b->h/2.f;
+				float xc = b->x0 + rx, yc=b->y0 + ry;
+				float sx = x - xc, sy = y - yc;
+				switch(t){
+					case H_SQUARE:
+						if(fabs(sx) > rx || fabs(sy) > ry) mark = 0;
+					break;
+					case H_ELLIPSE:
+						if(sx*sx/rx/rx+sy*sy/ry/ry > 1.f) mark = 0;
+					break;
+					default:
+						mark = 0;
+				}
+			}while(0);
+			if(!mark){xout[i] = 1e10f; yout[i] = 1e10f; continue;};
+		}
+		// OK, test is passed, calculate position on Z0:
+		K = (z0 - point[2]) / refl[2];
+		x = point[0] + K*refl[0];
+		y = point[1] + K*refl[1];
+		xout[i] = x;
+		yout[i] = y;
+	}
+	return 1;
 }
 

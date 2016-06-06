@@ -256,6 +256,7 @@ int main(int argc, char **argv){
 	// CCD bounding box
 	BBox CCD = {-5e-4*G->CCDW, -5e-4*G->CCDH, 1e-3*G->CCDW, 1e-3*G->CCDH};
 
+	DBG("obj A=%f, Z=%f",M->objA, M->objZ);
 	green("Make %d iterations by %d photons on each", G->N_iter, N_phot);
 	printf("\n");
 	for(x = 0; x < G->N_iter; ++x){
